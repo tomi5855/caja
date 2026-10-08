@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.0.1';
 
   /* Categorías fijas (decididas por Tomás el 08-10-2026). Cambiarlas es una decisión, no un retoque. */
   var GASTOS = [

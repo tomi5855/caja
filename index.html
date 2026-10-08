@@ -506,7 +506,7 @@ function iconOf(m){if(m.tipo==='inversion')return 'trend';var k=C.CAT[m.cat];ret
 
 /* ---------- Pantalla ---------- */
 var now0=new Date();
-var ui={tab:'apuntar',tipo:'gasto',buf:'',fecha:today(),editing:null,delArm:false,mesY:now0.getFullYear(),mesM:now0.getMonth(),
+var ui={tab:'apuntar',tipo:'gasto',buf:'',fecha:today(),editing:null,delArm:false,saving:false,mesY:now0.getFullYear(),mesM:now0.getMonth(),
   subEdit:null,subCada:'mes',subDelArm:false,ctaEdit:null,ctaTipo:'liquidez',ctaSaldoIni:null,ctaDelArm:false,pullArm:false,remote:null};
 
 /* ---------- Apuntar ---------- */
@@ -570,8 +570,10 @@ function resetEntry(){ui.buf='';ui.tipo='gasto';ui.fecha=today();ui.editing=null
 function pick(key,btn){
   var c=cents(ui.buf);
   if(c<=0){nudge();return}
-  btn.classList.add('hit');
+  if(ui.saving)return;
+  ui.saving=true;btn.classList.add('hit');$('nota').blur();
   setTimeout(function(){
+    ui.saving=false;
     var nota=$('nota').value.trim(),cat=key,cuenta=null;
     if(key.indexOf('cta:')===0){cat='aportacion';cuenta=key.slice(4)}
     if(ui.editing){
@@ -757,7 +759,7 @@ function putPath(path){
   return attempt();
 }
 function syncNow(){
-  if(syncing||!token())return Promise.resolve(renderSync());
+  if(syncing||!token()||ui.remote)return Promise.resolve(renderSync());
   var paths=pendingPaths();
   if(!paths.length){renderSync();return Promise.resolve()}
   syncing=true;renderSync();
@@ -810,6 +812,7 @@ function connect(){
 }
 function syncState(){
   if(!token())return {k:'none',t:'Sin copia: lo que apuntes solo está en este móvil.'};
+  if(ui.remote)return {k:'bad',t:'Hay datos en GitHub y en este móvil: elige con cuáles te quedas (en Ajustes).'};
   var n=pendingPaths().length,e=S.sync.err;
   if(syncing)return {k:'work',t:'Subiendo a GitHub…'};
   if(e==='llave')return {k:'bad',t:'La llave no vale o ha caducado. Crea otra y pégala aquí.'};
@@ -829,7 +832,7 @@ function openAjustes(){
   $('set-repo').value=S.sync.repo;$('set-token').value='';
   $('set-token').placeholder=token()?'Llave guardada (déjalo vacío para mantenerla)':'github_pat_…';
   ui.pullArm=false;$('set-pull').textContent='Traer de GitHub';$('set-err').textContent='';
-  $('set-choice').hidden=true;$('ver').textContent='v'+C.VERSION;renderSync();openSheet('ov-set');
+  $('set-choice').hidden=!ui.remote;$('ver').textContent='v'+C.VERSION;renderSync();openSheet('ov-set');
 }
 
 /* ---------- Aviso con deshacer ---------- */
