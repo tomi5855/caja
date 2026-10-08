@@ -7,31 +7,52 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.0.1';
+  var VERSION = '1.1.0';
 
-  /* Categorías fijas (decididas por Tomás el 08-10-2026). Cambiarlas es una decisión, no un retoque. */
-  var GASTOS = [
-    ['comidas', 'Comidas', 'utensils'],
-    ['ocio', 'Ocio', 'ticket'],
-    ['gasolina', 'Gasolina', 'fuel'],
-    ['deporte', 'Deporte', 'pulse'],
-    ['casa', 'Casa', 'home'],
-    ['caprichos', 'Caprichos', 'sparkles'],
-    ['trabajo', 'Trabajo', 'laptop'],
-    ['excepcionales', 'Excepcionales', 'star'],
-    ['otros', 'Otros', 'dots']
-  ];
-  var INGRESOS = [
-    ['nomina', 'Nómina', 'briefcase'],
-    ['extra', 'Extra', 'plus'],
-    ['otros-ingresos', 'Otros', 'dots']
-  ];
-  var CAT = {
-    suscripciones: { n: 'Suscripciones', i: 'repeat', tipo: 'gasto' },
-    aportacion: { n: 'Aportación', i: 'trend', tipo: 'inversion' }
+  /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
+     (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
+     Una categoría con juego: true se lleva aparte (metido, sacado y resultado) y cuenta en neto. */
+  var DEF_CATS = {
+    gasto: [
+      { id: 'comidas', n: 'Comidas', i: 'utensils' },
+      { id: 'ocio', n: 'Ocio', i: 'ticket' },
+      { id: 'gasolina', n: 'Gasolina', i: 'fuel' },
+      { id: 'deporte', n: 'Deporte', i: 'pulse' },
+      { id: 'casa', n: 'Casa', i: 'home' },
+      { id: 'caprichos', n: 'Caprichos', i: 'sparkles' },
+      { id: 'trabajo', n: 'Trabajo', i: 'laptop' },
+      { id: 'excepcionales', n: 'Excepcionales', i: 'star' },
+      { id: 'otros', n: 'Otros', i: 'dots' }
+    ],
+    ingreso: [
+      { id: 'nomina', n: 'Nómina', i: 'briefcase' },
+      { id: 'otros-ingresos', n: 'Otros', i: 'dots' }
+    ]
   };
-  GASTOS.forEach(function (c) { CAT[c[0]] = { n: c[1], i: c[2], tipo: 'gasto' }; });
-  INGRESOS.forEach(function (c) { CAT[c[0]] = { n: c[1], i: c[2], tipo: 'ingreso' }; });
+  /* Categorías que pone la propia app (y alguna antigua, para que los datos viejos se sigan leyendo). */
+  var FIXED = {
+    suscripciones: { n: 'Suscripciones', i: 'repeat' },
+    aportacion: { n: 'Aportación', i: 'trend' },
+    extra: { n: 'Extra', i: 'plus' }
+  };
+  function catsOf(state) {
+    var c = state && state.cats;
+    return {
+      gasto: c && c.gasto && c.gasto.length ? c.gasto : DEF_CATS.gasto,
+      ingreso: c && c.ingreso && c.ingreso.length ? c.ingreso : DEF_CATS.ingreso
+    };
+  }
+  function catMap(state) {
+    var m = {}, cs = catsOf(state);
+    Object.keys(FIXED).forEach(function (k) { m[k] = { n: FIXED[k].n, i: FIXED[k].i, juego: false }; });
+    cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: c.n, i: c.i, juego: !!c.juego }; });
+    return m;
+  }
+  function juegoIds(state) {
+    var ids = [], cs = catsOf(state);
+    cs.gasto.concat(cs.ingreso).forEach(function (c) { if (c.juego && ids.indexOf(c.id) < 0) ids.push(c.id); });
+    return ids;
+  }
 
   /* ---------- Fechas (siempre 'AAAA-MM-DD' en hora local) ---------- */
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -114,7 +135,10 @@
     });
   }
   function configDoc(state) {
-    return JSON.stringify({ v: 2, app: 'caja', cuentas: state.cuentas, subs: state.subs, saldos: state.saldos }, null, 2) + '\n';
+    var d = { v: 2, app: 'caja' };
+    if (state.cats) d.cats = state.cats;
+    d.cuentas = state.cuentas; d.subs = state.subs; d.saldos = state.saldos;
+    return JSON.stringify(d, null, 2) + '\n';
   }
 
   /* ---------- Totales del mes ---------- */
@@ -122,6 +146,25 @@
   function totales(list) {
     var o = { gasto: 0, ingreso: 0, inversion: 0 };
     list.forEach(function (m) { if (o[m.tipo] != null) o[m.tipo] += m.importe; });
+    return o;
+  }
+
+  /* Resumen del mes: el juego cuenta en neto (lo sacado menos lo metido). Si sale a favor suma a ingresos;
+     si sale en contra, a gastos. Así el % invertido y «en qué se va» no se inflan con lo que entra y sale. */
+  function resumenMes(list, jids) {
+    var o = { gasto: 0, ingreso: 0, inversion: 0, juego: { cats: {}, metido: 0, sacado: 0, neto: 0, n: 0 } };
+    list.forEach(function (m) {
+      if (jids && jids.indexOf(m.cat) >= 0 && (m.tipo === 'gasto' || m.tipo === 'ingreso')) {
+        var j = o.juego.cats[m.cat] || (o.juego.cats[m.cat] = { metido: 0, sacado: 0 });
+        if (m.tipo === 'gasto') { j.metido += m.importe; o.juego.metido += m.importe; }
+        else { j.sacado += m.importe; o.juego.sacado += m.importe; }
+        o.juego.n++;
+        return;
+      }
+      if (o[m.tipo] != null) o[m.tipo] += m.importe;
+    });
+    o.juego.neto = o.juego.sacado - o.juego.metido;
+    if (o.juego.neto > 0) o.ingreso += o.juego.neto; else o.gasto -= o.juego.neto;
     return o;
   }
 
@@ -205,12 +248,12 @@
   }
 
   return {
-    VERSION: VERSION, GASTOS: GASTOS, INGRESOS: INGRESOS, CAT: CAT, COLS: COLS,
+    VERSION: VERSION, DEF_CATS: DEF_CATS, catsOf: catsOf, catMap: catMap, juegoIds: juegoIds, COLS: COLS,
     pad2: pad2, iso: iso, today: today, parse: parse, dim: dim, addDays: addDays, diffDays: diffDays,
     startOfDay: startOfDay, monthKey: monthKey,
     parseEur: parseEur, fmtCsvEur: fmtCsvEur, parseCsvEur: parseCsvEur,
     movsToCsv: movsToCsv, parseCsv: parseCsv, csvToMovs: csvToMovs, configDoc: configDoc,
-    movsMes: movsMes, totales: totales,
+    movsMes: movsMes, totales: totales, resumenMes: resumenMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
     after: after, saldoActual: saldoActual, patrimonio: patrimonio
   };
