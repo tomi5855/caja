@@ -78,6 +78,9 @@ svg{display:block}
 .banner{display:flex;align-items:center;gap:10px;background:var(--sky-soft);border-radius:12px;padding:8px 8px 8px 12px;font-size:13px;line-height:1.35}
 .banner span{flex:1;min-width:0}
 .editbar{display:flex;align-items:center;gap:8px;background:var(--sky-soft);border-radius:12px;padding:8px 8px 8px 12px;font-size:14px}
+.lastbar{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px 5px 5px 12px;font-size:13px;color:var(--muted)}
+.lastbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lastbar b{color:var(--fg);font-weight:600}
 .editbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn-sm{flex:none;border:0;border-radius:9px;padding:7px 11px;font-weight:600;font-size:13px;background:var(--surface);color:var(--fg)}
 .btn-sm.danger{color:var(--danger)}
@@ -266,6 +269,7 @@ svg{display:block}
         <button class="gear" type="button" data-open="ajustes" aria-label="Ajustes y copia en GitHub"><span data-ic="gear"></span><i id="gear-dot" hidden></i></button>
       </div>
       <div class="banner" id="banner" hidden></div>
+      <div class="lastbar" id="lastbar" hidden><span id="last-txt"></span><button class="btn-sm danger" type="button" id="last-del">Quitar</button></div>
       <div class="editbar" id="editbar" hidden>
         <span id="edit-txt">Editando</span>
         <button class="btn-sm danger" type="button" id="edit-del">Borrar</button>
@@ -580,12 +584,21 @@ function renderEntryMeta(){
   if(T.ingreso>0)h+='<span>·</span><b>'+pct(T.inversion/T.ingreso)+'</b><span>invertido</span>';
   $('mini').innerHTML=h;
   var e=ui.editing;$('editbar').hidden=!e;
-  if(e){$('edit-txt').innerHTML='Editando <b>'+esc(e.label)+'</b>';$('edit-del').textContent=ui.delArm?'¿Seguro?':'Borrar'}
+  if(e){$('edit-txt').innerHTML='Editando <b>'+esc(e.label)+'</b>'}
+  var L=lastMov();$('lastbar').hidden=!!e||!L;
+  if(L&&!e){var mins=Math.floor((Date.now()-L.creado)/60000);
+    $('last-txt').innerHTML='Último: <b>'+esc(L.nota||nameOf(L))+'</b> · '+(L.tipo==='ingreso'?'+':'')+eur(L.importe)+' · '+(mins<1?'ahora':'hace '+mins+' min')}
   var b=$('banner');
   if(e){b.hidden=true}
   else if(!standalone()&&lsGet(HINT_KEY)!=='1'){b.innerHTML='<span>Instálala antes de apuntar: <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</span><button class="btn-sm" type="button" id="banner-ok">Vale</button>';b.hidden=false}
   else if(!token()){b.innerHTML='<span>Lo que apuntes solo está en este móvil.</span><button class="btn-sm" type="button" data-open="ajustes">Copia en GitHub</button>';b.hidden=false}
   else b.hidden=true;
+}
+/* Lo último que apuntaste a mano en la última hora (para quitarlo de un toque si te equivocas). */
+function lastMov(){var best=null;S.movs.forEach(function(m){if(!m.sub&&m.creado&&(!best||m.creado>best.creado))best=m});return best&&Date.now()-best.creado<3600000?best:null}
+function removeMov(m,msg){
+  S.movs=S.movs.filter(function(x){return x.id!==m.id});markMonth(m.fecha);changed();
+  toast(msg,function(){S.movs.push(m);markMonth(m.fecha);changed()});
 }
 function nudge(){var a=$('amount');a.classList.remove('nudge');void a.offsetWidth;a.classList.add('nudge')}
 function resetEntry(){ui.buf='';ui.tipo='gasto';ui.fecha=today();ui.editing=null;ui.delArm=false;$('nota').value=''}
@@ -894,7 +907,7 @@ var toastT=null,undoFn=null;
 function toast(msg,undo){
   $('toast-txt').textContent=msg;undoFn=undo||null;$('toast-undo').hidden=!undo;
   var t=$('toast');t.classList.add('show');clearTimeout(toastT);
-  toastT=setTimeout(function(){t.classList.remove('show');undoFn=null},4000);
+  toastT=setTimeout(function(){t.classList.remove('show');undoFn=null},undo?6000:3500);
 }
 
 /* ---------- Navegación y hojas ---------- */
@@ -944,12 +957,12 @@ document.addEventListener('click',function(e){
 all('.overlay').forEach(function(o){o.addEventListener('click',function(e){if(e.target===o)closeSheets()})});
 $('edit-del').addEventListener('click',function(){
   if(!ui.editing)return;
-  if(!ui.delArm){ui.delArm=true;renderEntryMeta();return}
-  var id=ui.editing.id,m=findMov(id);
-  S.movs=S.movs.filter(function(x){return x.id!==id});if(m)markMonth(m.fecha);resetEntry();persist();go('mes');scheduleSync();
-  toast('Movimiento borrado',function(){if(m){S.movs.push(m);markMonth(m.fecha);changed()}});
+  var m=findMov(ui.editing.id);resetEntry();go('mes');
+  if(m)removeMov(m,'Borrado: '+(m.nota||nameOf(m))+' · '+eur(m.importe));
 });
 $('edit-cancel').addEventListener('click',function(){resetEntry();go('mes')});
+$('last-del').addEventListener('click',function(){var m=lastMov();if(m)removeMov(m,'Quitado: '+(m.nota||nameOf(m))+' · '+eur(m.importe))});
+setInterval(function(){if(!document.hidden&&ui.tab==='apuntar')renderEntryMeta()},30000);
 $('toast-undo').addEventListener('click',function(){if(undoFn){var f=undoFn;undoFn=null;f();toast('Deshecho')}});
 $('mes-prev').addEventListener('click',function(){ui.mesM--;if(ui.mesM<0){ui.mesM=11;ui.mesY--}renderMes();$('v-mes').scrollTop=0});
 $('mes-next').addEventListener('click',function(){ui.mesM++;if(ui.mesM>11){ui.mesM=0;ui.mesY++}renderMes();$('v-mes').scrollTop=0});
