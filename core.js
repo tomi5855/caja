@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -16,8 +16,9 @@
     gasto: [
       { id: 'comidas', n: 'Comidas', i: 'utensils' },
       { id: 'ocio', n: 'Ocio', i: 'ticket' },
-      { id: 'gasolina', n: 'Gasolina', i: 'fuel' },
+      { id: 'coche', n: 'Coche', i: 'car' },
       { id: 'deporte', n: 'Deporte', i: 'pulse' },
+      { id: 'salud', n: 'Salud', i: 'pill' },
       { id: 'casa', n: 'Casa', i: 'home' },
       { id: 'caprichos', n: 'Caprichos', i: 'sparkles' },
       { id: 'trabajo', n: 'Trabajo', i: 'laptop' },
@@ -33,7 +34,8 @@
   var FIXED = {
     suscripciones: { n: 'Suscripciones', i: 'repeat' },
     aportacion: { n: 'Aportación', i: 'trend' },
-    extra: { n: 'Extra', i: 'plus' }
+    extra: { n: 'Extra', i: 'plus' },
+    gasolina: { n: 'Gasolina', i: 'fuel' }
   };
   function catsOf(state) {
     var c = state && state.cats;
