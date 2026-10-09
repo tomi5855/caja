@@ -184,6 +184,9 @@ svg{display:block}
 .mov .amt{font-family:var(--font-display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mov.in .amt{color:var(--ok)}
 .mov.inv .amt{color:var(--accent)}
+.mov.tr .amt{color:var(--muted)}
+.h2btn{flex:none;font-family:var(--font-body);font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:7px 11px;display:inline-flex;align-items:center;gap:6px;letter-spacing:0}
+.h2btn svg{width:16px;height:16px;color:var(--accent)}
 .auto{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--sky-soft);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:2px}
 
 .row-item{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 0;color:var(--fg)}
@@ -327,7 +330,7 @@ svg{display:block}
       </div>
       <div class="hero" id="pat-hero"></div>
       <div class="sec">
-        <h2>Dónde está</h2>
+        <h2>Dónde está <button class="h2btn" type="button" data-open="mover" id="pat-move" hidden><span data-ic="swap"></span>Mover dinero</button></h2>
         <div id="pat-list"></div>
         <p class="foot" id="pat-foot"></p>
       </div>
@@ -411,6 +414,30 @@ svg{display:block}
   </form>
 </div>
 
+<!-- Hoja: mover dinero entre cuentas -->
+<div class="overlay" id="ov-mov" hidden>
+  <form class="sheet" id="mf" autocomplete="off" novalidate>
+    <div class="sheet-head">
+      <h2 id="mf-title">Mover dinero</h2>
+      <button type="button" class="iconbtn" data-close aria-label="Cerrar"><span data-ic="x"></span></button>
+    </div>
+    <label class="field" for="mf-origen">Sale de<select id="mf-origen"></select></label>
+    <label class="field" for="mf-destino">Va a<select id="mf-destino"></select></label>
+    <div class="row">
+      <label class="field" for="mf-importe"><span id="mf-importe-lb">Importe (€)</span><input id="mf-importe" type="text" inputmode="decimal" placeholder="1.000,00"></label>
+      <label class="field" for="mf-fecha">Fecha<input id="mf-fecha" type="date"></label>
+    </div>
+    <label class="check" for="mf-todo"><input type="checkbox" id="mf-todo"><span class="sw"></span><span id="mf-todo-lb">Lo he vendido todo</span></label>
+    <label class="field" for="mf-nota">Nota (opcional)<input id="mf-nota" type="text" maxlength="60" placeholder="Vendo las posiciones"></label>
+    <p class="small">No es gasto ni ingreso y no cuenta en el % invertido del mes: solo cambia tu dinero de sitio.</p>
+    <p class="err" id="mf-err" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="mf-del" hidden>Borrar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
+  </form>
+</div>
+
 <!-- Hoja: ajustes -->
 <div class="overlay" id="ov-set" hidden>
   <form class="sheet" id="setf" autocomplete="off" novalidate>
@@ -482,7 +509,8 @@ var ICONS={
   calculator:'<rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
   compass:'<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
-  pill:'<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>'
+  pill:'<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
+  swap:'<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'
 };
 function svg(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||ICONS.dots)+'</svg>'}
 
@@ -526,14 +554,15 @@ function invCuentas(){return S.cuentas.filter(function(c){return c.tipo==='inver
 function activeSubs(){return S.subs.filter(function(s){return !s.hasta})}
 function runSubs(){var made=C.materialize(S,today(),uid);if(made.length){made.forEach(function(m){markMonth(m.fecha)});markConfig()}return made.length}
 function cmap(){return C.catMap(S)}
-function nameOf(m){if(m.tipo==='inversion'){var c=m.cuenta&&findCuenta(m.cuenta);return c?c.nombre:'Inversión'}var k=cmap()[m.cat];return k?k.n:m.cat}
-function iconOf(m){if(m.tipo==='inversion')return 'trend';var k=cmap()[m.cat];return k?k.i:'dots'}
+function ctaName(id){var c=id&&findCuenta(id);return c?c.nombre:'Cuenta borrada'}
+function nameOf(m){if(m.tipo==='traspaso')return ctaName(m.origen)+' → '+ctaName(m.cuenta);if(m.tipo==='inversion'){var c=m.cuenta&&findCuenta(m.cuenta);return c?c.nombre:'Inversión'}var k=cmap()[m.cat];return k?k.n:m.cat}
+function iconOf(m){if(m.tipo==='traspaso')return 'swap';if(m.tipo==='inversion')return 'trend';var k=cmap()[m.cat];return k?k.i:'dots'}
 function signed(c){return (c>0?'+':c<0?'−':'')+eur(Math.abs(c))}
 
 /* ---------- Pantalla ---------- */
 var now0=new Date();
 var ui={tab:'apuntar',tipo:'gasto',buf:'',fecha:today(),editing:null,delArm:false,saving:false,mesY:now0.getFullYear(),mesM:now0.getMonth(),
-  subEdit:null,subCada:'mes',subDelArm:false,ctaEdit:null,ctaTipo:'liquidez',ctaSaldoIni:null,ctaDelArm:false,pullArm:false,remote:null};
+  subEdit:null,subCada:'mes',subDelArm:false,ctaEdit:null,ctaTipo:'liquidez',ctaSaldoIni:null,ctaDelArm:false,movEdit:null,pullArm:false,remote:null};
 
 /* ---------- Apuntar ---------- */
 function cents(b){if(!b)return 0;var v=parseFloat(b.replace(',','.'));return isNaN(v)?0:Math.round(v*100)}
@@ -628,6 +657,7 @@ function pick(key,btn){
 }
 function startEdit(id){
   var m=findMov(id);if(!m)return;
+  if(m.tipo==='traspaso'){openMover(m.id);return}
   ui.editing={id:m.id,tipo:m.tipo,key:m.tipo==='inversion'?'cta:'+m.cuenta:m.cat,label:m.nota||nameOf(m)};
   ui.delArm=false;ui.tipo=m.tipo;ui.buf=bufFrom(m.importe);ui.fecha=m.fecha;$('nota').value=m.nota||'';
   go('apuntar');
@@ -641,8 +671,9 @@ function movRow(m){
   var nm=nameOf(m),title=m.nota||nm,sub=[];
   if(m.sub)sub.push(m.cat==='trabajo'?'Suscripción de trabajo':'Suscripción');
   else if(C.juegoIds(S).indexOf(m.cat)>=0){if(m.nota&&m.nota!==nm)sub.push(nm);sub.push(m.tipo==='gasto'?'Metido':'Sacado')}
+  else if(m.tipo==='traspaso'){if(m.nota)sub.push(nm);sub.push(C.vacia(m)?(cuentaTipo(m.origen)==='inversion'?'Vendido todo':'Cuenta vaciada'):'Entre tus cuentas')}
   else{if(m.nota&&m.nota!==nm)sub.push(nm);if(m.tipo==='ingreso')sub.push('Ingreso');if(m.tipo==='inversion')sub.push('Aportación')}
-  var cls=m.tipo==='ingreso'?' in':m.tipo==='inversion'?' inv':'';
+  var cls=m.tipo==='ingreso'?' in':m.tipo==='inversion'?' inv':m.tipo==='traspaso'?' tr':'';
   return '<button type="button" class="mov'+cls+'" data-id="'+esc(m.id)+'"><span class="ic">'+svg(iconOf(m))+'</span><span class="t"><b>'+esc(title)+(m.sub?'<span class="auto">auto</span>':'')+'</b>'+(sub.length?'<small>'+esc(sub.join(' · '))+'</small>':'')+'</span><span class="amt">'+(m.tipo==='ingreso'?'+':'')+eur(m.importe)+'</span></button>';
 }
 function renderMes(){
@@ -707,10 +738,11 @@ function renderPat(){
     var c=x.c,meta=(c.tipo==='inversion'?'Inversión':'Liquidez')+(c.principal?' · día a día':'');
     return '<button type="button" class="row-item" data-cuenta="'+esc(c.id)+'"><span class="av'+(c.tipo==='inversion'?' inv':'')+'">'+esc(c.nombre.charAt(0).toUpperCase())+'</span><span class="t"><b>'+esc(c.nombre)+'</b><small>'+meta+'</small></span><span class="r"><span class="amt">'+eur(x.v)+'</span><span class="when">real: '+shortDate(c.fecha)+'</span></span></button>';
   }).join(''):'<p class="empty">Todavía no hay cuentas.</p>';
+  $('pat-move').hidden=S.cuentas.length<2;
   var f='';
   if(S.cuentas.length){
     f=principal()
-      ?'Se mueve solo con lo que apuntas: gastos, ingresos y aportaciones salen o entran en la cuenta del día a día, y cada aportación suma en su cuenta de inversión. Cuando quieras (por ejemplo, el día 1), toca una cuenta y pon el saldo real: las inversiones cambian con el mercado.'
+      ?'Se mueve solo con lo que apuntas: gastos, ingresos y aportaciones salen o entran en la cuenta del día a día, y cada aportación suma en su cuenta de inversión. Para vender o pasar dinero de una cuenta a otra, usa «Mover dinero». Cuando quieras (por ejemplo, el día 1), toca una cuenta y pon el saldo real: las inversiones cambian con el mercado.'
       :'Marca una cuenta de liquidez como «del día a día» para que el patrimonio se mueva solo con lo que apuntas.';
   }
   $('pat-foot').textContent=f;
@@ -727,6 +759,42 @@ function openCuenta(id){
   $('cf-del').hidden=!c;$('cf-del').textContent='Borrar';
   $('cf-err').textContent='';
   syncCtaTipo();openSheet('ov-cta');
+}
+
+/* ---------- Mover dinero entre cuentas ----------
+   Un traspaso no es gasto ni ingreso: resta en la cuenta de origen y suma en la de destino.
+   «Lo he vendido todo» deja la de origen a 0 en ese momento (lo ganado o perdido se ajusta solo). */
+function cuentaTipo(id){var c=id&&findCuenta(id);return c?c.tipo:null}
+function ctaOptions(sel){
+  var L=S.cuentas.slice().sort(function(a,b){function r(x){return x.tipo==='liquidez'?(x.principal?0:1):2}return r(a)-r(b)});
+  var h=L.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===sel?' selected':'')+'>'+esc(c.nombre)+' · '+(c.tipo==='inversion'?'Inversión':'Liquidez')+'</option>'}).join('');
+  if(sel&&!findCuenta(sel))h='<option value="'+esc(sel)+'" selected>Cuenta borrada</option>'+h;
+  return h;
+}
+function syncMover(){
+  var inv=cuentaTipo($('mf-origen').value)==='inversion';
+  $('mf-todo-lb').innerHTML=inv
+    ?'Lo he vendido todo<small>Esta cuenta queda a 0 €. Pon lo que has recibido: si ganaste o perdiste, se ajusta solo.</small>'
+    :'He vaciado esta cuenta<small>Queda a 0 €, aunque lo que tenía apuntado no cuadrara del todo.</small>';
+  $('mf-importe-lb').textContent=inv?'Lo que recibes (€)':'Importe (€)';
+}
+function openMover(id){
+  var m=id?findMov(id):null;
+  ui.movEdit=m?m.id:null;
+  var p=principal(),orig=m?m.origen:null,dest=m?m.cuenta:null;
+  if(!m){
+    var inv=invCuentas()[0],otra=S.cuentas.filter(function(c){return c!==p})[0];
+    orig=(inv||otra||S.cuentas[0]||{}).id;
+    dest=(p&&p.id!==orig?p:S.cuentas.filter(function(c){return c.id!==orig})[0]||{}).id;
+  }
+  $('mf-title').textContent=m?'Movimiento entre cuentas':'Mover dinero';
+  $('mf-origen').innerHTML=ctaOptions(orig);$('mf-destino').innerHTML=ctaOptions(dest);
+  $('mf-importe').value=m?NF2.format(m.importe/100):'';
+  $('mf-fecha').value=m?m.fecha:today();$('mf-fecha').max=today();
+  $('mf-todo').checked=m?C.vacia(m):false;
+  $('mf-nota').value=m?(m.nota||''):'';
+  $('mf-del').hidden=!m;$('mf-err').textContent='';
+  syncMover();openSheet('ov-mov');
 }
 
 /* ---------- Suscripciones ---------- */
@@ -942,7 +1010,7 @@ all('#pad .key').forEach(function(key){
 document.addEventListener('click',function(e){
   var t=e.target&&e.target.closest?e.target.closest('button'):null;if(!t)return;
   if(t.hasAttribute('data-go')){var to=t.getAttribute('data-go');if(ui.editing&&to!=='apuntar')resetEntry();closeSheets();go(to);return}
-  if(t.hasAttribute('data-open')){var o=t.getAttribute('data-open');if(o==='ajustes')openAjustes();else if(o==='cuenta')openCuenta(null);else if(o==='sub')openSub(null);return}
+  if(t.hasAttribute('data-open')){var o=t.getAttribute('data-open');if(o==='ajustes')openAjustes();else if(o==='cuenta')openCuenta(null);else if(o==='sub')openSub(null);else if(o==='mover')openMover(null);return}
   if(t.hasAttribute('data-close')){closeSheets();return}
   if(t.hasAttribute('data-k')){if(e.detail===0)press(t.getAttribute('data-k'));return}
   if(t.hasAttribute('data-cat')){pick(t.getAttribute('data-cat'),t);return}
@@ -1012,6 +1080,26 @@ $('cf-del').addEventListener('click',function(){
   if(!ui.ctaDelArm){ui.ctaDelArm=true;$('cf-del').textContent='¿Seguro? Toca otra vez';return}
   var i=S.cuentas.indexOf(c);S.cuentas.splice(i,1);markConfig();closeSheets();changed();
   toast(c.nombre+' borrada',function(){S.cuentas.splice(i,0,c);markConfig();changed()});
+});
+
+/* Mover dinero: guardar y borrar */
+$('mf-origen').addEventListener('change',syncMover);
+$('mf').addEventListener('submit',function(e){
+  e.preventDefault();
+  var o=$('mf-origen').value,d=$('mf-destino').value,c=C.parseEur($('mf-importe').value),f=$('mf-fecha').value||today(),todo=$('mf-todo').checked,nota=$('mf-nota').value.trim();
+  if(!o||!d){$('mf-err').textContent='Elige de qué cuenta sale y a cuál va.';return}
+  if(o===d){$('mf-err').textContent='La cuenta de origen y la de destino tienen que ser distintas.';return}
+  if(c<=0){$('mf-err').textContent='Pon el importe, por ejemplo 1.000.';return}
+  if(f>today())f=today();
+  var cat=todo?'traspaso-todo':'traspaso',m=ui.movEdit?findMov(ui.movEdit):null;
+  if(m){markMonth(m.fecha);m.fecha=f;m.cat=cat;m.importe=c;m.cuenta=d;m.origen=o;m.nota=nota;markMonth(f);closeSheets();changed();toast('Cambios guardados');return}
+  var mov={id:uid(),fecha:f,tipo:'traspaso',cat:cat,importe:c,nota:nota,cuenta:d,origen:o,creado:Date.now()};
+  S.movs.push(mov);markMonth(f);closeSheets();changed();
+  toast('Movido · '+eur(c)+' a '+ctaName(d),function(){S.movs=S.movs.filter(function(x){return x.id!==mov.id});markMonth(mov.fecha);changed()});
+});
+$('mf-del').addEventListener('click',function(){
+  var m=findMov(ui.movEdit);if(!m)return;
+  closeSheets();removeMov(m,'Borrado: '+nameOf(m)+' · '+eur(m.importe));
 });
 
 /* Ajustes */

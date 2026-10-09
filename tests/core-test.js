@@ -10,6 +10,10 @@ t('dinero', () => {
   assert.strictEqual(C.parseEur('11.99'), 1199);
   assert.strictEqual(C.parseEur('1.250,5 €'), 125050);
   assert.strictEqual(C.parseEur(''), 0);
+  assert.strictEqual(C.parseEur('2.100'), 210000);     // punto de miles, como se escribe en España
+  assert.strictEqual(C.parseEur('1.250.000'), 125000000);
+  assert.strictEqual(C.parseEur('3.000,5'), 300050);
+  assert.strictEqual(C.parseEur('2.1'), 210);           // un punto con 1-2 decimales sigue siendo decimal
   assert.strictEqual(C.fmtCsvEur(1250), '12,50');
   assert.strictEqual(C.fmtCsvEur(-5), '-0,05');
   assert.strictEqual(C.parseCsvEur('12,5'), 1250);
@@ -22,20 +26,30 @@ t('csv ida y vuelta con notas raras', () => {
     { id: 'a', fecha: '2026-10-08', tipo: 'gasto', cat: 'comidas', importe: 1250, nota: 'Menú; con "postre"', creado: Date.parse('2026-10-08T12:00:00Z') },
     { id: 'b', fecha: '2026-10-01', tipo: 'ingreso', cat: 'sueldo', importe: 140000, nota: 'Nómina\nseptiembre', creado: Date.parse('2026-10-01T08:00:00Z') },
     { id: 'c', fecha: '2026-10-02', tipo: 'inversion', cat: 'aportacion', importe: 25000, nota: '', cuenta: 'ibkr', creado: Date.parse('2026-10-02T09:00:00Z') },
-    { id: 'd', fecha: '2026-10-03', tipo: 'gasto', cat: 'suscripciones', importe: 1199, nota: 'Spotify', sub: 's1', creado: Date.parse('2026-10-02T22:00:00Z') }
+    { id: 'd', fecha: '2026-10-03', tipo: 'gasto', cat: 'suscripciones', importe: 1199, nota: 'Spotify', sub: 's1', creado: Date.parse('2026-10-02T22:00:00Z') },
+    { id: 'e', fecha: '2026-10-04', tipo: 'traspaso', cat: 'traspaso-todo', importe: 210000, nota: '', cuenta: 'dia', origen: 'inv', creado: Date.parse('2026-10-04T09:00:00Z') }
   ];
   const csv = C.movsToCsv(movs);
-  assert.ok(csv.startsWith('id;fecha;tipo;categoria;importe;nota;cuenta;suscripcion;creado\n'));
+  assert.ok(csv.startsWith('id;fecha;tipo;categoria;importe;nota;cuenta;suscripcion;creado;origen\n'));
   const back = C.csvToMovs(csv);
-  assert.strictEqual(back.length, 4);
+  assert.strictEqual(back.length, 5);
   const byId = Object.fromEntries(back.map(m => [m.id, m]));
   for (const m of movs) {
     const b = byId[m.id];
     assert.strictEqual(b.fecha, m.fecha); assert.strictEqual(b.tipo, m.tipo); assert.strictEqual(b.cat, m.cat);
     assert.strictEqual(b.importe, m.importe); assert.strictEqual(b.nota, m.nota); assert.strictEqual(b.creado, m.creado);
-    assert.strictEqual(b.cuenta, m.cuenta); assert.strictEqual(b.sub, m.sub);
+    assert.strictEqual(b.cuenta, m.cuenta); assert.strictEqual(b.sub, m.sub); assert.strictEqual(b.origen, m.origen);
   }
-  assert.deepStrictEqual(back.map(m => m.id), ['b', 'c', 'd', 'a']); // ordenado por fecha
+  assert.deepStrictEqual(back.map(m => m.id), ['b', 'c', 'd', 'e', 'a']); // ordenado por fecha
+});
+
+t('csv antiguo, sin la columna origen, se sigue leyendo', () => {
+  const viejo = 'id;fecha;tipo;categoria;importe;nota;cuenta;suscripcion;creado\n' +
+    'x;2026-10-08;gasto;comidas;12,50;Menú;;;2026-10-08T12:00:00.000Z\n';
+  const L = C.csvToMovs(viejo);
+  assert.strictEqual(L.length, 1);
+  assert.strictEqual(L[0].importe, 1250);
+  assert.strictEqual(L[0].origen, undefined);
 });
 
 t('cobros de suscripción: mensual, anual y día 31', () => {
@@ -86,6 +100,38 @@ t('patrimonio se mueve con lo apuntado y respeta el saldo real', () => {
   assert.strictEqual(v.ibkr, 200000 + 25000 + 5000);
   assert.strictEqual(p.total, v.dia + v.aho + v.ibkr);
   assert.strictEqual(p.invertido, v.ibkr);
+});
+
+t('mover dinero entre cuentas: traspaso, vender todo y saldo real posterior', () => {
+  const base = Date.parse('2026-10-09T10:00:00');
+  const st = {
+    cuentas: [
+      { id: 'dia', nombre: 'Día a día', tipo: 'liquidez', principal: true, saldo: 100000, fecha: '2026-10-09', ts: base },
+      { id: 'otra', nombre: 'Otra', tipo: 'liquidez', principal: false, saldo: 50000, fecha: '2026-10-09', ts: base },
+      { id: 'pos', nombre: 'Posiciones', tipo: 'inversion', saldo: 200000, fecha: '2026-10-09', ts: base }
+    ],
+    movs: []
+  };
+  const v = () => Object.fromEntries(C.patrimonio(st).cuentas.map(x => [x.c.id, x.v]));
+  // pasar dinero de una liquidez que no es la del día a día a la del día a día
+  st.movs.push({ id: 't1', fecha: '2026-10-09', tipo: 'traspaso', cat: 'traspaso', importe: 30000, cuenta: 'dia', origen: 'otra', creado: base + 1000 });
+  assert.deepStrictEqual(v(), { dia: 130000, otra: 20000, pos: 200000 });
+  // vender todo: recibe 210.000 (ganó 100 €); la cuenta de inversión queda a 0 y el total sube lo ganado
+  st.movs.push({ id: 't2', fecha: '2026-10-10', tipo: 'traspaso', cat: 'traspaso-todo', importe: 210000, cuenta: 'dia', origen: 'pos', creado: base + 2000 });
+  assert.deepStrictEqual(v(), { dia: 340000, otra: 20000, pos: 0 });
+  assert.strictEqual(C.patrimonio(st).invertido, 0);
+  // volver a comprar con parte de la liquidez
+  st.movs.push({ id: 't3', fecha: '2026-10-12', tipo: 'traspaso', cat: 'traspaso', importe: 50000, cuenta: 'pos', origen: 'dia', creado: base + 3000 });
+  assert.deepStrictEqual(v(), { dia: 290000, otra: 20000, pos: 50000 });
+  // borrar la venta devuelve el saldo de antes (no deja un 0 suelto)
+  const sinVenta = { cuentas: st.cuentas, movs: st.movs.filter(m => m.id !== 't2') };
+  assert.strictEqual(C.saldoActual(sinVenta, st.cuentas[2]), 250000);
+  // un saldo real puesto después de la venta manda sobre ella
+  st.cuentas[2] = Object.assign({}, st.cuentas[2], { saldo: 52000, fecha: '2026-10-15', ts: base + 9000 });
+  assert.strictEqual(v().pos, 52000);
+  // los traspasos no son gasto, ingreso ni inversión del mes
+  const R = C.resumenMes(st.movs.concat([{ tipo: 'ingreso', cat: 'sueldo', importe: 100000 }]), []);
+  assert.deepStrictEqual([R.gasto, R.ingreso, R.inversion], [0, 100000, 0]);
 });
 
 t('totales del mes', () => {

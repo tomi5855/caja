@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -34,6 +34,8 @@
   var FIXED = {
     suscripciones: { n: 'Suscripciones', i: 'repeat' },
     aportacion: { n: 'Aportación', i: 'trend' },
+    traspaso: { n: 'Entre tus cuentas', i: 'swap' },
+    'traspaso-todo': { n: 'Entre tus cuentas', i: 'swap' },
     extra: { n: 'Extra', i: 'plus' },
     gasolina: { n: 'Gasolina', i: 'fuel' }
   };
@@ -72,6 +74,7 @@
     v = String(v == null ? '' : v).trim().replace(/\s|€/g, '');
     if (!v) return 0;
     if (v.indexOf(',') >= 0) v = v.replace(/\./g, '').replace(',', '.');
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, ''); // «2.100» son 2.100 €, no 2,10 €
     var n = parseFloat(v);
     return isNaN(n) ? 0 : Math.round(n * 100);
   }
@@ -90,7 +93,8 @@
   }
 
   /* ---------- CSV del mes (separador ';' y coma decimal, como lo abre Sheets en español) ---------- */
-  var COLS = ['id', 'fecha', 'tipo', 'categoria', 'importe', 'nota', 'cuenta', 'suscripcion', 'creado'];
+  /* «origen» va al final (v1.3): los CSV anteriores, sin esa columna, se siguen leyendo igual. */
+  var COLS = ['id', 'fecha', 'tipo', 'categoria', 'importe', 'nota', 'cuenta', 'suscripcion', 'creado', 'origen'];
   function byFechaCreado(a, b) {
     if (a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
     return (a.creado || 0) - (b.creado || 0);
@@ -103,7 +107,7 @@
     var rows = [COLS.join(';')];
     list.slice().sort(byFechaCreado).forEach(function (m) {
       rows.push([m.id, m.fecha, m.tipo, m.cat, fmtCsvEur(m.importe), m.nota || '', m.cuenta || '', m.sub || '',
-        new Date(m.creado || startOfDay(m.fecha)).toISOString()].map(csvCell).join(';'));
+        new Date(m.creado || startOfDay(m.fecha)).toISOString(), m.origen || ''].map(csvCell).join(';'));
     });
     return rows.join('\n') + '\n';
   }
@@ -133,6 +137,7 @@
         nota: g('nota'), creado: Date.parse(g('creado')) || startOfDay(g('fecha')) };
       if (g('cuenta')) m.cuenta = g('cuenta');
       if (g('suscripcion')) m.sub = g('suscripcion');
+      if (g('origen')) m.origen = g('origen');
       return m;
     });
   }
@@ -221,22 +226,36 @@
   /* ---------- Patrimonio ----------
      Cada cuenta guarda su último saldo real (saldo, fecha, ts). Desde ahí se mueve sola:
      - la cuenta del día a día (principal): + ingresos, − gastos, − aportaciones;
-     - cada cuenta de inversión: + las aportaciones que van a ella.
+     - cada cuenta de inversión: + las aportaciones que van a ella;
+     - cualquier cuenta: + lo que se mueve a ella y − lo que sale de ella (tipo «traspaso», v1.3).
+     Un traspaso «traspaso-todo» (vendido todo / cuenta vaciada) deja la cuenta de origen a 0 en ese momento,
+     como un saldo real: lo ganado o perdido en el mercado se ajusta solo. Si se borra, vuelve el saldo anterior.
      Un movimiento cuenta si es posterior al saldo real: fecha mayor, o el mismo día pero apuntado después. */
   function after(m, base) {
     return m.fecha > base.fecha || (m.fecha === base.fecha && (m.creado || 0) > (base.ts || 0));
   }
+  function vacia(m) { return m.tipo === 'traspaso' && m.cat === 'traspaso-todo'; }
+  function baseOf(state, c) {
+    var b = { saldo: c.saldo || 0, fecha: c.fecha, ts: c.ts };
+    state.movs.forEach(function (m) {
+      if (vacia(m) && m.origen === c.id && after(m, b)) b = { saldo: 0, fecha: m.fecha, ts: m.creado || startOfDay(m.fecha) };
+    });
+    return b;
+  }
   function saldoActual(state, c) {
-    var v = c.saldo || 0;
-    if (c.tipo === 'inversion') {
-      state.movs.forEach(function (m) { if (m.tipo === 'inversion' && m.cuenta === c.id && after(m, c)) v += m.importe; });
-    } else if (c.principal) {
-      state.movs.forEach(function (m) {
-        if (!after(m, c)) return;
+    var b = baseOf(state, c), v = b.saldo;
+    state.movs.forEach(function (m) {
+      if (!after(m, b)) return;
+      if (m.tipo === 'traspaso') {
+        if (m.cuenta === c.id) v += m.importe;
+        if (m.origen === c.id) v -= m.importe;
+      } else if (c.tipo === 'inversion') {
+        if (m.tipo === 'inversion' && m.cuenta === c.id) v += m.importe;
+      } else if (c.principal) {
         if (m.tipo === 'ingreso') v += m.importe;
         else if (m.tipo === 'gasto' || m.tipo === 'inversion') v -= m.importe;
-      });
-    }
+      }
+    });
     return v;
   }
   function patrimonio(state) {
@@ -257,6 +276,6 @@
     movsToCsv: movsToCsv, parseCsv: parseCsv, csvToMovs: csvToMovs, configDoc: configDoc,
     movsMes: movsMes, totales: totales, resumenMes: resumenMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
-    after: after, saldoActual: saldoActual, patrimonio: patrimonio
+    after: after, vacia: vacia, baseOf: baseOf, saldoActual: saldoActual, patrimonio: patrimonio
   };
 });
