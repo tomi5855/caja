@@ -99,39 +99,92 @@ t('patrimonio se mueve con lo apuntado y respeta el saldo real', () => {
   assert.strictEqual(v.aho, 300000);
   assert.strictEqual(v.ibkr, 200000 + 25000 + 5000);
   assert.strictEqual(p.total, v.dia + v.aho + v.ibkr);
-  assert.strictEqual(p.invertido, v.ibkr);
+  // v1.4: lo aportado llega al efectivo de la cuenta de inversión; lo invertido sigue en su saldo real
+  assert.strictEqual(p.invertido, 200000);
+  assert.strictEqual(p.cuentas.find(x => x.c.id === 'ibkr').ef, 30000);
 });
 
-t('mover dinero entre cuentas: traspaso, vender todo y saldo real posterior', () => {
+t('bolsillos: efectivo e invertido, comprar, vender todo y saldo real posterior', () => {
   const base = Date.parse('2026-10-09T10:00:00');
   const st = {
     cuentas: [
-      { id: 'dia', nombre: 'Día a día', tipo: 'liquidez', principal: true, saldo: 100000, fecha: '2026-10-09', ts: base },
+      { id: 'tr', nombre: 'Bróker diario', tipo: 'inversion', principal: true, saldo: 200000, efectivo: 100000, fecha: '2026-10-09', ts: base },
       { id: 'otra', nombre: 'Otra', tipo: 'liquidez', principal: false, saldo: 50000, fecha: '2026-10-09', ts: base },
-      { id: 'pos', nombre: 'Posiciones', tipo: 'inversion', saldo: 200000, fecha: '2026-10-09', ts: base }
+      { id: 'fon', nombre: 'Fondos', tipo: 'inversion', principal: false, saldo: 500000, efectivo: 10000, fecha: '2026-10-09', ts: base }
     ],
     movs: []
   };
-  const v = () => Object.fromEntries(C.patrimonio(st).cuentas.map(x => [x.c.id, x.v]));
-  // pasar dinero de una liquidez que no es la del día a día a la del día a día
-  st.movs.push({ id: 't1', fecha: '2026-10-09', tipo: 'traspaso', cat: 'traspaso', importe: 30000, cuenta: 'dia', origen: 'otra', creado: base + 1000 });
-  assert.deepStrictEqual(v(), { dia: 130000, otra: 20000, pos: 200000 });
-  // vender todo: recibe 210.000 (ganó 100 €); la cuenta de inversión queda a 0 y el total sube lo ganado
-  st.movs.push({ id: 't2', fecha: '2026-10-10', tipo: 'traspaso', cat: 'traspaso-todo', importe: 210000, cuenta: 'dia', origen: 'pos', creado: base + 2000 });
-  assert.deepStrictEqual(v(), { dia: 340000, otra: 20000, pos: 0 });
-  assert.strictEqual(C.patrimonio(st).invertido, 0);
-  // volver a comprar con parte de la liquidez
-  st.movs.push({ id: 't3', fecha: '2026-10-12', tipo: 'traspaso', cat: 'traspaso', importe: 50000, cuenta: 'pos', origen: 'dia', creado: base + 3000 });
-  assert.deepStrictEqual(v(), { dia: 290000, otra: 20000, pos: 50000 });
-  // borrar la venta devuelve el saldo de antes (no deja un 0 suelto)
+  const v = () => Object.fromEntries(C.patrimonio(st).cuentas.map(x => [x.c.id, [x.ef, x.inv]]));
+  assert.deepStrictEqual(v(), { tr: [100000, 200000], otra: [50000, 0], fon: [10000, 500000] });
+  // un gasto sale del efectivo de la cuenta del día a día, aunque sea un bróker
+  st.movs.push({ id: 'g', fecha: '2026-10-09', tipo: 'gasto', cat: 'comidas', importe: 1000, creado: base + 500 });
+  assert.deepStrictEqual(v().tr, [99000, 200000]);
+  // pasar de otra liquidez al día a día
+  st.movs.push({ id: 't1', fecha: '2026-10-09', tipo: 'traspaso', cat: 'traspaso', importe: 30000, cuenta: 'tr', origen: 'otra', creado: base + 1000 });
+  assert.deepStrictEqual(v().otra, [20000, 0]);
+  // vender todo lo invertido del día a día: recibe 210.000 (ganó 100 €)
+  st.movs.push({ id: 't2', fecha: '2026-10-10', tipo: 'traspaso', cat: 'traspaso-todo', importe: 210000, cuenta: 'tr', origen: 'tr:inv', creado: base + 2000 });
+  assert.deepStrictEqual(v().tr, [339000, 0]);
+  // DCA: del día a día al efectivo de los fondos, y la compra pasa de efectivo a invertido
+  st.movs.push({ id: 't3', fecha: '2026-10-11', tipo: 'traspaso', cat: 'traspaso', importe: 20000, cuenta: 'fon', origen: 'tr', creado: base + 3000 });
+  st.movs.push({ id: 't4', fecha: '2026-10-12', tipo: 'traspaso', cat: 'traspaso', importe: 25000, cuenta: 'fon:inv', origen: 'fon', creado: base + 4000 });
+  assert.deepStrictEqual(v().fon, [5000, 525000]);
+  assert.deepStrictEqual(v().tr, [319000, 0]);
+  // borrar la venta devuelve lo invertido de antes (no deja un 0 suelto)
   const sinVenta = { cuentas: st.cuentas, movs: st.movs.filter(m => m.id !== 't2') };
-  assert.strictEqual(C.saldoActual(sinVenta, st.cuentas[2]), 250000);
-  // un saldo real puesto después de la venta manda sobre ella
-  st.cuentas[2] = Object.assign({}, st.cuentas[2], { saldo: 52000, fecha: '2026-10-15', ts: base + 9000 });
-  assert.strictEqual(v().pos, 52000);
-  // los traspasos no son gasto, ingreso ni inversión del mes
-  const R = C.resumenMes(st.movs.concat([{ tipo: 'ingreso', cat: 'sueldo', importe: 100000 }]), []);
-  assert.deepStrictEqual([R.gasto, R.ingreso, R.inversion], [0, 100000, 0]);
+  assert.deepStrictEqual([C.saldos(sinVenta, st.cuentas[0]).ef, C.saldos(sinVenta, st.cuentas[0]).inv], [109000, 200000]);
+  // un saldo real puesto después manda
+  st.cuentas[2] = Object.assign({}, st.cuentas[2], { saldo: 530000, efectivo: 0, fecha: '2026-10-15', ts: base + 9000 });
+  assert.deepStrictEqual(v().fon, [0, 530000]);
+  // % invertido del mes: solo cuenta lo que entra en una cuenta de inversión desde la liquidez o el día a día
+  const R = C.resumenMes(st.movs.concat([{ tipo: 'ingreso', cat: 'sueldo', importe: 100000 }]), [], st.cuentas);
+  assert.deepStrictEqual([R.gasto, R.ingreso, R.inversion], [1000, 100000, 20000]);
+  const R0 = C.resumenMes(st.movs, []); // sin cuentas, los traspasos no cuentan
+  assert.strictEqual(R0.inversion, 0);
+});
+
+t('lo que añade Claude: saldos de los brókeres y movimientos del correo sin duplicar', () => {
+  const base = Date.parse('2026-10-09T10:00:00');
+  const st = {
+    cuentas: [
+      { id: 'dia', nombre: 'Día', tipo: 'liquidez', principal: true, saldo: 100000, fecha: '2026-10-09', ts: base },
+      { id: 'ib', nombre: 'Bróker', tipo: 'inversion', saldo: 1000000, efectivo: 0, fecha: '2026-10-09', ts: base },
+      { id: 'fon', nombre: 'Fondos', tipo: 'inversion', saldo: 500000, efectivo: 10000, fecha: '2026-10-09', ts: base }
+    ],
+    movs: [],
+    auto: {
+      saldos: [
+        { cuenta: 'ib', fecha: '2026-10-10', ts: base + 86400000, inv: 520000, ef: 500000, fuente: 'IBKR' },
+        { cuenta: 'ib', fecha: '2026-10-08', ts: 0, inv: 1, ef: 1 } // más antiguo que el puesto a mano: no cuenta
+      ],
+      movs: [
+        { id: 'a1', fecha: '2026-10-10', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'dia', cuenta: 'fon', dedupe: true, nota: 'Transferencia' },
+        { id: 'a2', fecha: '2026-10-11', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'fon', cuenta: 'fon:inv', nota: 'Fondo A' }
+      ]
+    }
+  };
+  let p = C.patrimonio(st), v = id => p.cuentas.find(x => x.c.id === id);
+  assert.deepStrictEqual([v('ib').ef, v('ib').inv], [500000, 520000]);
+  assert.deepStrictEqual([v('fon').ef, v('fon').inv, v('dia').ef], [10000, 520000, 80000]);
+  assert.ok(C.allMovs(st).every(m => m.id.startsWith('a') ? m.auto : true));
+  // si también se apunta a mano la transferencia (mismo importe, 1 día después), no se cuenta dos veces
+  st.movs.push({ id: 'mio', fecha: '2026-10-11', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'dia', cuenta: 'fon', creado: base + 2 * 86400000 });
+  p = C.patrimonio(st);
+  assert.deepStrictEqual([v('fon').ef, v('fon').inv, v('dia').ef], [10000, 520000, 80000]);
+  assert.strictEqual(C.allMovs(st).length, 2);
+  // y en el mes cuenta una sola vez como invertido
+  assert.strictEqual(C.resumenMes(C.allMovs(st), [], st.cuentas).inversion, 20000);
+});
+
+t('ingresos habituales: se apuntan solos el día que tocan, en su categoría', () => {
+  const st = { cats: { gasto: [], ingreso: [{ id: 'sueldo', n: 'Sueldo', i: 'briefcase' }] }, movs: [], subs: [
+    { id: 'n', tipo: 'ingreso', nombre: 'Nómina', importe: 90000, cada: 'mes', dia: 1, desde: '2026-10-09', hasta: null },
+    { id: 'p', tipo: 'ingreso', cat: 'otra', nombre: 'Alquiler', importe: 30000, cada: 'mes', dia: 20, desde: '2026-10-09', hasta: null }
+  ] };
+  assert.strictEqual(C.materialize(st, '2026-10-19', uid).length, 0);
+  const made = C.materialize(st, '2026-11-02', uid, 7);
+  assert.deepStrictEqual(made.map(m => [m.fecha, m.tipo, m.cat, m.importe]).sort(),
+    [['2026-10-20', 'ingreso', 'otra', 30000], ['2026-11-01', 'ingreso', 'sueldo', 90000]]);
 });
 
 t('totales del mes', () => {

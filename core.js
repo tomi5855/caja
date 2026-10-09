@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -157,10 +157,13 @@
   }
 
   /* Resumen del mes: el juego cuenta en neto (lo sacado menos lo metido). Si sale a favor suma a ingresos;
-     si sale en contra, a gastos. Así el % invertido y «en qué se va» no se inflan con lo que entra y sale. */
-  function resumenMes(list, jids) {
+     si sale en contra, a gastos. Así el % invertido y «en qué se va» no se inflan con lo que entra y sale.
+     Con las cuentas (v1.4), un traspaso cuenta como invertido si va de la liquidez (o de la cuenta del día a día)
+     a una cuenta de inversión, y resta si vuelve. Comprar o vender dentro de una misma cuenta no cuenta. */
+  function resumenMes(list, jids, cuentas) {
     var o = { gasto: 0, ingreso: 0, inversion: 0, juego: { cats: {}, metido: 0, sacado: 0, neto: 0, n: 0 } };
     list.forEach(function (m) {
+      if (m.tipo === 'traspaso') { if (cuentas) o.inversion += flujo(m, cuentas) * m.importe; return; }
       if (jids && jids.indexOf(m.cat) >= 0 && (m.tipo === 'gasto' || m.tipo === 'ingreso')) {
         var j = o.juego.cats[m.cat] || (o.juego.cats[m.cat] = { metido: 0, sacado: 0 });
         if (m.tipo === 'gasto') { j.metido += m.importe; o.juego.metido += m.importe; }
@@ -175,7 +178,7 @@
     return o;
   }
 
-  /* ---------- Suscripciones: se apuntan solas como gasto el día de cobro ---------- */
+  /* ---------- Habituales: suscripciones (gasto) e ingresos habituales (v1.4) se apuntan solos el día que tocan ---------- */
   function chargeDates(s, from, to) {
     var out = [];
     if (!from || !to || from > to) return out;
@@ -202,7 +205,9 @@
       chargeDates(s, from, to).forEach(function (f) {
         var exists = state.movs.some(function (m) { return m.sub === s.id && m.fecha === f; });
         if (!exists) {
-          var m = { id: uid(), fecha: f, tipo: 'gasto', cat: s.trabajo ? 'trabajo' : 'suscripciones', importe: s.importe,
+          var ing = s.tipo === 'ingreso';
+          var cat = ing ? (s.cat || (catsOf(state).ingreso[0] || {}).id || 'otros-ingresos') : (s.trabajo ? 'trabajo' : 'suscripciones');
+          var m = { id: uid(), fecha: f, tipo: ing ? 'ingreso' : 'gasto', cat: cat, importe: s.importe,
             nota: s.nombre, sub: s.id, creado: f === nowIso ? nowTs : startOfDay(f) };
           state.movs.push(m); created.push(m);
         }
@@ -223,49 +228,103 @@
   }
   function monthlyEq(s) { return s.cada === 'mes' ? s.importe : s.importe / 12; }
 
-  /* ---------- Patrimonio ----------
-     Cada cuenta guarda su último saldo real (saldo, fecha, ts). Desde ahí se mueve sola:
-     - la cuenta del día a día (principal): + ingresos, − gastos, − aportaciones;
-     - cada cuenta de inversión: + las aportaciones que van a ella;
-     - cualquier cuenta: + lo que se mueve a ella y − lo que sale de ella (tipo «traspaso», v1.3).
-     Un traspaso «traspaso-todo» (vendido todo / cuenta vaciada) deja la cuenta de origen a 0 en ese momento,
-     como un saldo real: lo ganado o perdido en el mercado se ajusta solo. Si se borra, vuelve el saldo anterior.
-     Un movimiento cuenta si es posterior al saldo real: fecha mayor, o el mismo día pero apuntado después. */
+  /* ---------- Patrimonio (v1.4) ----------
+     Cada cuenta tiene efectivo y, si es de inversión (bróker), también invertido. Una cuenta de liquidez solo
+     tiene efectivo. Un movimiento señala un «bolsillo»: «id» es el efectivo de la cuenta e «id:inv» lo invertido.
+     - gasto e ingreso: efectivo de la cuenta del día a día (principal), sea de liquidez o un bróker;
+     - traspaso: sale de un bolsillo y entra en otro (comprar = efectivo → invertido de la misma cuenta);
+     - «inversion» (aportación antigua): del día a día al efectivo de la cuenta de inversión.
+     Cada cuenta parte de su último saldo real: el que se pone a mano o el que deja Claude en auto.json (gana el
+     más reciente). Un traspaso «traspaso-todo» deja su bolsillo de origen a 0 en ese momento.
+     Un movimiento cuenta si es posterior al saldo: fecha mayor, o el mismo día pero apuntado después. */
   function after(m, base) {
     return m.fecha > base.fecha || (m.fecha === base.fecha && (m.creado || 0) > (base.ts || 0));
   }
+  function later(a, b) { return a.fecha > b.fecha || (a.fecha === b.fecha && (a.ts || 0) > (b.ts || 0)); }
+  function pk(ref) {
+    ref = String(ref == null ? '' : ref);
+    var i = ref.indexOf(':');
+    return i < 0 ? { id: ref, part: 'ef' } : { id: ref.slice(0, i), part: ref.slice(i + 1) === 'inv' ? 'inv' : 'ef' };
+  }
+  function pref(id, part) { return part === 'inv' ? id + ':inv' : id; }
   function vacia(m) { return m.tipo === 'traspaso' && m.cat === 'traspaso-todo'; }
-  function baseOf(state, c) {
-    var b = { saldo: c.saldo || 0, fecha: c.fecha, ts: c.ts };
-    state.movs.forEach(function (m) {
-      if (vacia(m) && m.origen === c.id && after(m, b)) b = { saldo: 0, fecha: m.fecha, ts: m.creado || startOfDay(m.fecha) };
+  function findC(state, id) { for (var i = 0; i < state.cuentas.length; i++) if (state.cuentas[i].id === id) return state.cuentas[i]; return null; }
+  function principalId(state) { for (var i = 0; i < state.cuentas.length; i++) if (state.cuentas[i].principal) return state.cuentas[i].id; return null; }
+  function esInv(c) { return !!c && c.tipo === 'inversion'; }
+
+  /* Lo que añade Claude (auto.json): movimientos leídos del correo y saldos leídos de los brókeres.
+     Una transferencia que Claude saca del correo (dedupe) no se cuenta si ya se apuntó a mano un traspaso o una
+     aportación a esa cuenta por el mismo importe y a menos de 3 días. */
+  function autoOf(state) { return state.auto || {}; }
+  function allMovs(state) {
+    var own = state.movs || [], extra = (autoOf(state).movs || []).filter(function (a) {
+      if (!a || !a.id || !a.fecha) return false;
+      if (!a.dedupe) return true;
+      var dest = pk(a.cuenta).id;
+      return !own.some(function (x) {
+        return (x.tipo === 'traspaso' || x.tipo === 'inversion') && x.importe === a.importe && pk(x.cuenta).id === dest &&
+          Math.abs(diffDays(x.fecha, a.fecha)) <= 3;
+      });
+    }).map(function (a) { var o = {}; for (var k in a) o[k] = a[k]; o.auto = true; o.creado = a.creado || startOfDay(a.fecha); return o; });
+    return own.concat(extra);
+  }
+  function snapOf(state, c) {
+    var b = esInv(c) ? { fecha: c.fecha, ts: c.ts, inv: c.saldo || 0, ef: c.efectivo || 0 } : { fecha: c.fecha, ts: c.ts, inv: 0, ef: c.saldo || 0 };
+    (autoOf(state).saldos || []).forEach(function (x) {
+      if (x && x.cuenta === c.id && x.fecha && later(x, b)) b = { fecha: x.fecha, ts: x.ts || 0, inv: esInv(c) ? (x.inv || 0) : 0, ef: x.ef || 0, fuente: x.fuente };
     });
     return b;
   }
-  function saldoActual(state, c) {
-    var b = baseOf(state, c), v = b.saldo;
-    state.movs.forEach(function (m) {
-      if (!after(m, b)) return;
-      if (m.tipo === 'traspaso') {
-        if (m.cuenta === c.id) v += m.importe;
-        if (m.origen === c.id) v -= m.importe;
-      } else if (c.tipo === 'inversion') {
-        if (m.tipo === 'inversion' && m.cuenta === c.id) v += m.importe;
-      } else if (c.principal) {
-        if (m.tipo === 'ingreso') v += m.importe;
-        else if (m.tipo === 'gasto' || m.tipo === 'inversion') v -= m.importe;
-      }
-    });
-    return v;
+  function efectos(m, princ) {
+    var v = m.importe || 0;
+    if (m.tipo === 'gasto') return princ ? [[princ, -v]] : [];
+    if (m.tipo === 'ingreso') return princ ? [[princ, v]] : [];
+    if (m.tipo === 'inversion') return (princ ? [[princ, -v]] : []).concat(m.cuenta ? [[pk(m.cuenta).id, v]] : []);
+    if (m.tipo === 'traspaso') return [[m.origen, -v], [m.cuenta, v]];
+    return [];
   }
+  function saldos(state, c, movs) {
+    movs = movs || allMovs(state);
+    var snap = snapOf(state, c), princ = principalId(state), out = { ef: 0, inv: 0, snap: snap };
+    (esInv(c) ? ['ef', 'inv'] : ['ef']).forEach(function (part) {
+      var b = { v: snap[part], fecha: snap.fecha, ts: snap.ts };
+      movs.forEach(function (m) {
+        if (!vacia(m)) return;
+        var o = pk(m.origen);
+        if (o.id === c.id && (esInv(c) ? o.part : 'ef') === part && after(m, b)) b = { v: 0, fecha: m.fecha, ts: m.creado || startOfDay(m.fecha) };
+      });
+      var v = b.v;
+      movs.forEach(function (m) {
+        if (!after(m, b)) return;
+        efectos(m, princ).forEach(function (e) {
+          var p = pk(e[0]);
+          if (p.id === c.id && (esInv(c) ? p.part : 'ef') === part) v += e[1];
+        });
+      });
+      out[part] = v;
+    });
+    out.v = out.ef + out.inv;
+    return out;
+  }
+  function saldoActual(state, c) { return saldos(state, c).v; }
   function patrimonio(state) {
-    var liq = 0, inv = 0;
+    var liq = 0, inv = 0, movs = allMovs(state);
     var cuentas = state.cuentas.map(function (c) {
-      var v = saldoActual(state, c);
-      if (c.tipo === 'inversion') inv += v; else liq += v;
-      return { c: c, v: v };
+      var x = saldos(state, c, movs);
+      liq += x.ef; inv += x.inv;
+      return { c: c, v: x.v, ef: x.ef, inv: x.inv, snap: x.snap };
     });
     return { total: liq + inv, liquidez: liq, invertido: inv, cuentas: cuentas };
+  }
+  /* +1 si el traspaso mete dinero en una cuenta de inversión desde la liquidez o el día a día, −1 si lo saca,
+     0 si se queda dentro (comprar o vender en la misma cuenta, o entre cuentas del mismo tipo). */
+  function flujo(m, cuentas) {
+    if (m.tipo !== 'traspaso') return 0;
+    var o = pk(m.origen).id, d = pk(m.cuenta).id;
+    if (o === d) return 0;
+    function inv(id) { for (var i = 0; i < cuentas.length; i++) if (cuentas[i].id === id) return cuentas[i].tipo === 'inversion' && !cuentas[i].principal; return false; }
+    var a = inv(o), b = inv(d);
+    return !a && b ? 1 : a && !b ? -1 : 0;
   }
 
   return {
@@ -276,6 +335,7 @@
     movsToCsv: movsToCsv, parseCsv: parseCsv, csvToMovs: csvToMovs, configDoc: configDoc,
     movsMes: movsMes, totales: totales, resumenMes: resumenMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
-    after: after, vacia: vacia, baseOf: baseOf, saldoActual: saldoActual, patrimonio: patrimonio
+    after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, allMovs: allMovs,
+    snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo
   };
 });
