@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.4.0';
+  var VERSION = '1.4.1';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -268,12 +268,25 @@
     }).map(function (a) { var o = {}; for (var k in a) o[k] = a[k]; o.auto = true; o.creado = a.creado || startOfDay(a.fecha); return o; });
     return own.concat(extra);
   }
-  function snapOf(state, c) {
-    var b = esInv(c) ? { fecha: c.fecha, ts: c.ts, inv: c.saldo || 0, ef: c.efectivo || 0 } : { fecha: c.fecha, ts: c.ts, inv: 0, ef: c.saldo || 0 };
+  /* Base de cada bolsillo: el saldo real puesto a mano o, si es más reciente, el que deja Claude. Un saldo de
+     Claude puede traer solo uno de los dos (p. ej. solo «inv», el valor de los fondos): el otro bolsillo sigue
+     saliendo de su base y de los movimientos, y así un movimiento apuntado tarde no se pierde. */
+  function bases(state, c) {
+    var inv = esInv(c), b = {
+      ef: { v: inv ? (c.efectivo || 0) : (c.saldo || 0), fecha: c.fecha, ts: c.ts },
+      inv: { v: inv ? (c.saldo || 0) : 0, fecha: c.fecha, ts: c.ts }
+    };
     (autoOf(state).saldos || []).forEach(function (x) {
-      if (x && x.cuenta === c.id && x.fecha && later(x, b)) b = { fecha: x.fecha, ts: x.ts || 0, inv: esInv(c) ? (x.inv || 0) : 0, ef: x.ef || 0, fuente: x.fuente };
+      if (!x || x.cuenta !== c.id || !x.fecha) return;
+      ['ef', 'inv'].forEach(function (p) {
+        if (typeof x[p] === 'number' && (p === 'ef' || inv) && later(x, b[p])) b[p] = { v: x[p], fecha: x.fecha, ts: x.ts || 0, fuente: x.fuente };
+      });
     });
     return b;
+  }
+  function snapOf(state, c) {
+    var b = bases(state, c), l = esInv(c) && later(b.inv, b.ef) ? b.inv : b.ef;
+    return { fecha: l.fecha, ts: l.ts, fuente: l.fuente, ef: b.ef.v, inv: b.inv.v };
   }
   function efectos(m, princ) {
     var v = m.importe || 0;
@@ -285,9 +298,9 @@
   }
   function saldos(state, c, movs) {
     movs = movs || allMovs(state);
-    var snap = snapOf(state, c), princ = principalId(state), out = { ef: 0, inv: 0, snap: snap };
+    var bs = bases(state, c), princ = principalId(state), out = { ef: 0, inv: 0, snap: snapOf(state, c) };
     (esInv(c) ? ['ef', 'inv'] : ['ef']).forEach(function (part) {
-      var b = { v: snap[part], fecha: snap.fecha, ts: snap.ts };
+      var b = { v: bs[part].v, fecha: bs[part].fecha, ts: bs[part].ts };
       movs.forEach(function (m) {
         if (!vacia(m)) return;
         var o = pk(m.origen);

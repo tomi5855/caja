@@ -176,6 +176,28 @@ t('lo que añade Claude: saldos de los brókeres y movimientos del correo sin du
   assert.strictEqual(C.resumenMes(C.allMovs(st), [], st.cuentas).inversion, 20000);
 });
 
+t('saldo de Claude solo de lo invertido: el efectivo sigue saliendo de los movimientos', () => {
+  const base = Date.parse('2026-10-09T10:00:00');
+  const st = {
+    cuentas: [
+      { id: 'dia', nombre: 'Día', tipo: 'inversion', principal: true, saldo: 0, efectivo: 100000, fecha: '2026-10-09', ts: base },
+      { id: 'fon', nombre: 'Fondos', tipo: 'inversion', saldo: 500000, efectivo: 10000, fecha: '2026-10-09', ts: base }
+    ],
+    movs: [],
+    auto: { saldos: [{ cuenta: 'fon', fecha: '2026-10-12', ts: base + 3 * 86400000, inv: 530000, fuente: 'Fondos' }], movs: [] }
+  };
+  const v = () => { const x = C.saldos(st, st.cuentas[1]); return [x.ef, x.inv]; };
+  assert.deepStrictEqual(v(), [10000, 530000]);
+  // un traspaso apuntado tarde, con fecha anterior al valor de los fondos, sí llega al efectivo
+  st.movs.push({ id: 't', fecha: '2026-10-10', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'dia', cuenta: 'fon', creado: base + 4 * 86400000 });
+  assert.deepStrictEqual(v(), [30000, 530000]);
+  assert.strictEqual(C.saldos(st, st.cuentas[0]).ef, 80000);
+  // una compra con fecha anterior al último valor: sale del efectivo y no se suma dos veces a lo invertido
+  st.auto.movs.push({ id: 'c', fecha: '2026-10-11', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'fon', cuenta: 'fon:inv', creado: base + 2 * 86400000 });
+  assert.deepStrictEqual(v(), [10000, 530000]);
+  assert.strictEqual(C.snapOf(st, st.cuentas[1]).fuente, 'Fondos');
+});
+
 t('ingresos habituales: se apuntan solos el día que tocan, en su categoría', () => {
   const st = { cats: { gasto: [], ingreso: [{ id: 'sueldo', n: 'Sueldo', i: 'briefcase' }] }, movs: [], subs: [
     { id: 'n', tipo: 'ingreso', nombre: 'Nómina', importe: 90000, cada: 'mes', dia: 1, desde: '2026-10-09', hasta: null },
