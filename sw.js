@@ -1,6 +1,6 @@
 /* Caja · service worker: abre al instante y sin conexión. Sirve lo guardado y lo refresca por detrás;
    la versión nueva entra la siguiente vez que se abre la app. Nunca guarda llamadas a GitHub. */
-var CACHE = 'caja-1.4.1';
+var CACHE = 'caja-1.4.2';
 var SHELL = ['./', 'index.html', 'core.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {

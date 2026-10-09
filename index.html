@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Caja</title>
 <meta name="description" content="Apunta gastos, ingresos e inversión. Mira tu mes, tu patrimonio y tus suscripciones.">
-<meta name="theme-color" content="#F1F8FD" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#08131F" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F1F8FD">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -19,6 +19,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
+/* Siempre en claro (v1.4.2), aunque el móvil esté en oscuro: blanca con el celeste.
+   El tema oscuro se queda definido por si algún día se quiere volver a seguir al sistema (quitar data-theme). */
 /* Concepto: una pantalla por tarea. Apuntar con el pulgar (importe → categoría y listo), el mes en un número
    (qué % de lo que entra se invierte), el patrimonio en otro (qué % está invertido) y las suscripciones que se
    cobran solas. El celeste de Tomás es el único acento. */
