@@ -7,11 +7,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.5.0';
+  var VERSION = '1.6.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
-     Una categoría con juego: true se lleva aparte (metido, sacado y resultado) y cuenta en neto. */
+     Una categoría con juego: true se lleva aparte (metido, sacado y resultado) y cuenta en neto.
+     Una categoría con grupo (v1.6) se llama «nombre + grupo» (p. ej. «Nómina» + «Bar» = «Nómina Bar») y en el mes
+     se suma con las demás de su grupo: así se ve cuánto sale de un mismo sitio aunque llegue por varias vías. */
   var DEF_CATS = {
     gasto: [
       { id: 'comidas', n: 'Comidas', i: 'utensils' },
@@ -49,9 +51,10 @@
   function catMap(state) {
     var m = {}, cs = catsOf(state);
     Object.keys(FIXED).forEach(function (k) { m[k] = { n: FIXED[k].n, i: FIXED[k].i, juego: false }; });
-    cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: c.n, i: c.i, juego: !!c.juego }; });
+    cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: fullName(c), corto: c.n, grupo: c.grupo || '', i: c.i, juego: !!c.juego }; });
     return m;
   }
+  function fullName(c) { return c.grupo ? c.n + ' ' + c.grupo : c.n; }
   function juegoIds(state) {
     var ids = [], cs = catsOf(state);
     cs.gasto.concat(cs.ingreso).forEach(function (c) { if (c.juego && ids.indexOf(c.id) < 0) ids.push(c.id); });
@@ -159,9 +162,11 @@
   /* Resumen del mes: el juego cuenta en neto (lo sacado menos lo metido). Si sale a favor suma a ingresos;
      si sale en contra, a gastos. Así el % invertido y «en qué se va» no se inflan con lo que entra y sale.
      Con las cuentas (v1.4), un traspaso cuenta como invertido si va de la liquidez (o de la cuenta del día a día)
-     a una cuenta de inversión, y resta si vuelve. Comprar o vender dentro de una misma cuenta no cuenta. */
+     a una cuenta de inversión, y resta si vuelve. Comprar o vender dentro de una misma cuenta no cuenta.
+     «efectivo» (v1.6): lo gastado e ingresado en billetes (cuenta de efectivo), sin el juego, que va en neto. */
   function resumenMes(list, jids, cuentas) {
-    var o = { gasto: 0, ingreso: 0, inversion: 0, juego: { cats: {}, metido: 0, sacado: 0, neto: 0, n: 0 } };
+    var o = { gasto: 0, ingreso: 0, inversion: 0, efectivo: { gasto: 0, ingreso: 0 }, juego: { cats: {}, metido: 0, sacado: 0, neto: 0, n: 0 } };
+    var cash = metalicoId({ cuentas: cuentas || [] });
     list.forEach(function (m) {
       if (m.tipo === 'traspaso') { if (cuentas) o.inversion += flujo(m, cuentas) * m.importe; return; }
       if (jids && jids.indexOf(m.cat) >= 0 && (m.tipo === 'gasto' || m.tipo === 'ingreso')) {
@@ -172,10 +177,32 @@
         return;
       }
       if (o[m.tipo] != null) o[m.tipo] += m.importe;
+      if (cash && m.cuenta && pk(m.cuenta).id === cash && o.efectivo[m.tipo] != null) o.efectivo[m.tipo] += m.importe;
     });
     o.juego.neto = o.juego.sacado - o.juego.metido;
     if (o.juego.neto > 0) o.ingreso += o.juego.neto; else o.gasto -= o.juego.neto;
     return o;
+  }
+
+  /* Ingresos del mes por categoría (v1.6). Las del mismo grupo van en una fila con el detalle de cada una (p. ej.
+     nómina y horas extra de un mismo trabajo). El juego, en neto y solo si sale a favor: así suman lo mismo que
+     los ingresos del resumen. */
+  function ingresosMes(list, state) {
+    var cs = catsOf(state), jids = juegoIds(state), cm = catMap(state), by = {}, order = [], rows = [], idx = {}, net = 0;
+    list.forEach(function (m) {
+      if (m.tipo !== 'ingreso' && m.tipo !== 'gasto') return;
+      if (jids.indexOf(m.cat) >= 0) { net += m.tipo === 'ingreso' ? m.importe : -m.importe; return; }
+      if (m.tipo === 'ingreso') by[m.cat] = (by[m.cat] || 0) + m.importe;
+    });
+    cs.ingreso.forEach(function (c) { if (by[c.id] != null && order.indexOf(c.id) < 0) order.push(c.id); });
+    Object.keys(by).forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
+    order.forEach(function (id) {
+      var c = cm[id] || { n: id, corto: id, grupo: '', i: 'dots' }, key = c.grupo ? 'g:' + c.grupo : id, r = idx[key];
+      if (!r) { r = idx[key] = { key: key, n: c.grupo || c.n, i: c.i, grupo: !!c.grupo, v: 0, partes: [] }; rows.push(r); }
+      r.v += by[id]; r.partes.push({ id: id, n: c.grupo ? c.corto : c.n, v: by[id] });
+    });
+    if (net > 0) rows.push({ key: '__juego', n: 'Juego (resultado)', i: 'dice', grupo: false, v: net, partes: [] });
+    return rows.sort(function (a, b) { return b.v - a.v; });
   }
 
   /* ---------- Habituales: suscripciones (gasto) e ingresos habituales (v1.4) se apuntan solos el día que tocan ---------- */
@@ -231,7 +258,8 @@
   /* ---------- Patrimonio (v1.4) ----------
      Cada cuenta tiene efectivo y, si es de inversión (bróker), también invertido. Una cuenta de liquidez solo
      tiene efectivo. Un movimiento señala un «bolsillo»: «id» es el efectivo de la cuenta e «id:inv» lo invertido.
-     - gasto e ingreso: efectivo de la cuenta del día a día (principal), sea de liquidez o un bróker;
+     - gasto e ingreso: efectivo de la cuenta del día a día (principal), sea de liquidez o un bróker; o de la cuenta
+       que diga el movimiento (v1.6: pagado en efectivo, con billetes);
      - traspaso: sale de un bolsillo y entra en otro (comprar = efectivo → invertido de la misma cuenta);
      - «inversion» (aportación antigua): del día a día al efectivo de la cuenta de inversión.
      Cada cuenta parte de su último saldo real: el que se pone a mano o el que deja Claude en auto.json (gana el
@@ -251,6 +279,13 @@
   function findC(state, id) { for (var i = 0; i < state.cuentas.length; i++) if (state.cuentas[i].id === id) return state.cuentas[i]; return null; }
   function principalId(state) { for (var i = 0; i < state.cuentas.length; i++) if (state.cuentas[i].principal) return state.cuentas[i].id; return null; }
   function esInv(c) { return !!c && c.tipo === 'inversion'; }
+  /* Cuenta de efectivo (v1.6): billetes y monedas. Es una cuenta de liquidez con metalico: true (no la del día a
+     día). Un gasto o ingreso con «cuenta» = esa cuenta sale o entra de ahí; sin «cuenta», va al día a día. */
+  function metalicoId(state) {
+    var L = (state && state.cuentas) || [];
+    for (var i = 0; i < L.length; i++) if (L[i].metalico && !L[i].principal && L[i].tipo !== 'inversion') return L[i].id;
+    return null;
+  }
 
   /* Lo que añade Claude (auto.json): movimientos leídos del correo y saldos leídos de los brókeres.
      Una transferencia que Claude saca del correo (dedupe) no se cuenta si ya se apuntó a mano un traspaso o una
@@ -290,8 +325,9 @@
   }
   function efectos(m, princ) {
     var v = m.importe || 0;
-    if (m.tipo === 'gasto') return princ ? [[princ, -v]] : [];
-    if (m.tipo === 'ingreso') return princ ? [[princ, v]] : [];
+    var de = m.cuenta ? pk(m.cuenta).id : princ;
+    if (m.tipo === 'gasto') return de ? [[de, -v]] : [];
+    if (m.tipo === 'ingreso') return de ? [[de, v]] : [];
     if (m.tipo === 'inversion') return (princ ? [[princ, -v]] : []).concat(m.cuenta ? [[pk(m.cuenta).id, v]] : []);
     if (m.tipo === 'traspaso') return [[m.origen, -v], [m.cuenta, v]];
     return [];
@@ -341,14 +377,14 @@
   }
 
   return {
-    VERSION: VERSION, DEF_CATS: DEF_CATS, catsOf: catsOf, catMap: catMap, juegoIds: juegoIds, COLS: COLS,
+    VERSION: VERSION, DEF_CATS: DEF_CATS, catsOf: catsOf, catMap: catMap, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
     pad2: pad2, iso: iso, today: today, parse: parse, dim: dim, addDays: addDays, diffDays: diffDays,
     startOfDay: startOfDay, monthKey: monthKey,
     parseEur: parseEur, fmtCsvEur: fmtCsvEur, parseCsvEur: parseCsvEur,
     movsToCsv: movsToCsv, parseCsv: parseCsv, csvToMovs: csvToMovs, configDoc: configDoc,
-    movsMes: movsMes, totales: totales, resumenMes: resumenMes,
+    movsMes: movsMes, totales: totales, resumenMes: resumenMes, ingresosMes: ingresosMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
-    after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, allMovs: allMovs,
+    after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,
     snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo
   };
 });

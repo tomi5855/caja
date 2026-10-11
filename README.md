@@ -27,3 +27,12 @@ El móvil **solo lo lee**, nunca lo sube:
 - `gestionadas`: `{idCuenta: "quién la actualiza"}` y `posiciones`: `{idCuenta: [{nombre, valor, nota}]}`.
 
 Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cuenta e `id:inv` lo invertido.
+
+## Categorías con grupo y cuenta de efectivo (v1.6)
+
+- En `config.json`, una categoría puede llevar `grupo` (`{id, n, i, grupo}`): se llama «n + grupo» (p. ej. «Nómina» +
+  «Bar» = «Nómina Bar») y en Mes se suma con las demás de su grupo en una sola fila de Ingresos, con el detalle.
+- Una cuenta de liquidez con `metalico: true` (y que no sea la del día a día) es el **efectivo**: billetes y monedas.
+  Al apuntar un gasto o ingreso sale «Tarjeta» (o «Banco») y un toque lo pasa a «Efectivo» para ese apunte; entonces
+  el movimiento lleva `cuenta` = esa cuenta y sale o entra de ahí en vez de la del día a día. Sacar del cajero es un
+  traspaso de la cuenta del día a día a la de efectivo.

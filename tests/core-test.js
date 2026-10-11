@@ -248,4 +248,62 @@ t('resumen del mes con el juego en neto', () => {
   assert.strictEqual(R3.ingreso, 117000);
 });
 
+t('efectivo (v1.6): el gasto pagado con billetes sale de la cuenta de efectivo, no del día a día', () => {
+  const base = Date.parse('2026-10-11T10:00:00');
+  const st = {
+    cuentas: [
+      { id: 'dia', nombre: 'Día a día', tipo: 'inversion', principal: true, saldo: 0, efectivo: 100000, fecha: '2026-10-11', ts: base },
+      { id: 'bil', nombre: 'Cartera', tipo: 'liquidez', metalico: true, saldo: 14500, fecha: '2026-10-11', ts: base }
+    ],
+    movs: [
+      { id: 'g1', fecha: '2026-10-11', tipo: 'gasto', cat: 'comidas', importe: 1000, creado: base + 1 },               // tarjeta
+      { id: 'g2', fecha: '2026-10-11', tipo: 'gasto', cat: 'comidas', importe: 250, cuenta: 'bil', creado: base + 2 }, // efectivo
+      { id: 'i1', fecha: '2026-10-12', tipo: 'ingreso', cat: 'extras', importe: 4000, cuenta: 'bil', creado: base + 3 },
+      { id: 'c1', fecha: '2026-10-12', tipo: 'traspaso', cat: 'traspaso', importe: 5000, origen: 'dia', cuenta: 'bil', creado: base + 4 } // cajero
+    ]
+  };
+  assert.strictEqual(C.metalicoId(st), 'bil');
+  const v = id => C.saldos(st, st.cuentas.find(c => c.id === id));
+  assert.strictEqual(v('dia').ef, 100000 - 1000 - 5000);
+  assert.strictEqual(v('bil').ef, 14500 - 250 + 4000 + 5000);
+  const R = C.resumenMes(st.movs, [], st.cuentas);
+  assert.deepStrictEqual(R.efectivo, { gasto: 250, ingreso: 4000 });
+  assert.strictEqual(R.gasto, 1250);
+  assert.strictEqual(R.inversion, 0); // sacar del cajero no es invertir
+  // sin cuenta de efectivo marcada no hay efectivo en el resumen
+  assert.deepStrictEqual(C.resumenMes(st.movs, [], [st.cuentas[0]]).efectivo, { gasto: 0, ingreso: 0 });
+  // la del día a día o una de inversión no cuentan como efectivo aunque lleven la marca
+  assert.strictEqual(C.metalicoId({ cuentas: [{ id: 'x', tipo: 'liquidez', metalico: true, principal: true }] }), null);
+  assert.strictEqual(C.metalicoId({ cuentas: [{ id: 'y', tipo: 'inversion', metalico: true }] }), null);
+  // el CSV guarda la cuenta del gasto pagado en efectivo
+  const back = C.csvToMovs(C.movsToCsv(st.movs));
+  assert.strictEqual(back.find(m => m.id === 'g2').cuenta, 'bil');
+  assert.strictEqual(back.find(m => m.id === 'g1').cuenta, undefined);
+});
+
+t('grupos de ingresos (v1.6): nombre completo y suma por sitio', () => {
+  const st = { cats: { gasto: [{ id: 'comidas', n: 'Comidas', i: 'utensils' }, { id: 'juego-a', n: 'Juego A', i: 'dice', juego: true }],
+    ingreso: [{ id: 'nomina', n: 'Nómina', i: 'briefcase', grupo: 'Bar' }, { id: 'beca', n: 'Beca', i: 'wallet' },
+      { id: 'extras', n: 'Extras', i: 'clock', grupo: 'Bar' }, { id: 'juego-a', n: 'Juego A', i: 'dice', juego: true }] } };
+  const m = C.catMap(st);
+  assert.strictEqual(m.nomina.n, 'Nómina Bar');
+  assert.strictEqual(m.nomina.corto, 'Nómina');
+  assert.strictEqual(m.extras.grupo, 'Bar');
+  assert.strictEqual(m.beca.n, 'Beca');
+  const L = [
+    { tipo: 'ingreso', cat: 'extras', importe: 6000 }, { tipo: 'ingreso', cat: 'nomina', importe: 40000 },
+    { tipo: 'ingreso', cat: 'beca', importe: 30000 }, { tipo: 'ingreso', cat: 'extras', importe: 2000 },
+    { tipo: 'gasto', cat: 'comidas', importe: 999 },
+    { tipo: 'gasto', cat: 'juego-a', importe: 1000 }, { tipo: 'ingreso', cat: 'juego-a', importe: 3000 }
+  ];
+  const rows = C.ingresosMes(L, st);
+  assert.deepStrictEqual(rows.map(r => [r.n, r.v]), [['Bar', 48000], ['Beca', 30000], ['Juego (resultado)', 2000]]);
+  assert.deepStrictEqual(rows[0].partes.map(p => [p.n, p.v]), [['Nómina', 40000], ['Extras', 8000]]); // en el orden de las categorías
+  assert.strictEqual(rows[0].i, 'briefcase');
+  // suman lo mismo que los ingresos del resumen
+  assert.strictEqual(rows.reduce((a, r) => a + r.v, 0), C.resumenMes(L, C.juegoIds(st)).ingreso);
+  // con el juego en contra no sale fila de juego
+  assert.ok(!C.ingresosMes(L.concat([{ tipo: 'gasto', cat: 'juego-a', importe: 5000 }]), st).some(r => r.key === '__juego'));
+});
+
 console.log(n + ' pruebas OK');
