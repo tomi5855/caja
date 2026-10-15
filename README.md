@@ -36,3 +36,16 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
   Al apuntar un gasto o ingreso sale «Tarjeta» (o «Banco») y un toque lo pasa a «Efectivo» para ese apunte; entonces
   el movimiento lleva `cuenta` = esa cuenta y sale o entra de ahí en vez de la del día a día. Sacar del cajero es un
   traspaso de la cuenta del día a día a la de efectivo.
+
+## Categorías desde el móvil y copia en un archivo (v1.7)
+
+- **Ajustes → Cambiar categorías:** añadir (12 como mucho por lista), cambiar nombre e icono, marcar «Es de juego»
+  (va en las dos listas con el mismo id) y borrar. Borrar una que ya tiene movimientos o habituales solo la oculta
+  (`oculta: true`): no sale en los botones, pero el historial sigue diciendo su nombre y, si era de juego, sigue en neto.
+  Se guardan en `cats` de `config.json`. Mientras un cambio hecho en el móvil no se ha subido, las categorías del
+  móvil mandan sobre las de GitHub; después, vuelve a mandar GitHub.
+- **Ajustes → Copia en un archivo:** «Guardar copia» crea `caja-copia-AAAA-MM-DD.json` (en el iPhone abre Compartir →
+  Guardar en Archivos) con `config` (lo mismo que `config.json`) y `movs`. Nunca lleva la llave. «Recuperar copia» la
+  lee, dice qué trae y sustituye lo del móvil (con «Deshacer»). Sin GitHub, Apuntar avisa de guardar copia con 10
+  movimientos sin ninguna copia o si la última tiene más de un mes.
+- El repositorio de GitHub ya no viene escrito: cada persona pone el suyo (`usuario/caja-datos`).

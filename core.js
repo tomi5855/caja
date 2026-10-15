@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -41,22 +41,29 @@
     extra: { n: 'Extra', i: 'plus' },
     gasolina: { n: 'Gasolina', i: 'fuel' }
   };
-  function catsOf(state) {
+  /* Todas las categorías, también las borradas que ya tenían movimientos (oculta: true): no salen en los botones,
+     pero el historial sigue diciendo su nombre. catsOf da solo las que se usan para apuntar. */
+  function catsAll(state) {
     var c = state && state.cats;
     return {
       gasto: c && c.gasto && c.gasto.length ? c.gasto : DEF_CATS.gasto,
       ingreso: c && c.ingreso && c.ingreso.length ? c.ingreso : DEF_CATS.ingreso
     };
   }
+  function visibles(L) { return L.filter(function (c) { return !c.oculta; }); }
+  function catsOf(state) {
+    var a = catsAll(state);
+    return { gasto: visibles(a.gasto), ingreso: visibles(a.ingreso) };
+  }
   function catMap(state) {
-    var m = {}, cs = catsOf(state);
+    var m = {}, cs = catsAll(state);
     Object.keys(FIXED).forEach(function (k) { m[k] = { n: FIXED[k].n, i: FIXED[k].i, juego: false }; });
     cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: fullName(c), corto: c.n, grupo: c.grupo || '', i: c.i, juego: !!c.juego }; });
     return m;
   }
   function fullName(c) { return c.grupo ? c.n + ' ' + c.grupo : c.n; }
   function juegoIds(state) {
-    var ids = [], cs = catsOf(state);
+    var ids = [], cs = catsAll(state);
     cs.gasto.concat(cs.ingreso).forEach(function (c) { if (c.juego && ids.indexOf(c.id) < 0) ids.push(c.id); });
     return ids;
   }
@@ -144,6 +151,74 @@
       return m;
     });
   }
+  /* ---------- Cambiar categorías desde el móvil (v1.7) ----------
+     Se trabaja sobre una copia ({gasto, ingreso}) y la app la guarda en state.cats (config.json).
+     Una categoría de juego va en las dos listas con el mismo id: se mete como gasto y se saca como ingreso.
+     Borrar una que ya tiene movimientos solo la oculta, para que el historial siga teniendo su nombre. */
+  var MAX_CATS = 12;
+  function copyCats(state) {
+    var a = catsAll(state);
+    function cp(L) { return L.map(function (c) { return JSON.parse(JSON.stringify(c)); }); }
+    return { gasto: cp(a.gasto), ingreso: cp(a.ingreso) };
+  }
+  function catSlug(s) {
+    var t = String(s || '').toLowerCase();
+    if (t.normalize) t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return t.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'categoria';
+  }
+  function findCat(L, id) { for (var i = 0; i < L.length; i++) if (L[i].id === id) return L[i]; return null; }
+  function catIdLibre(cats, base) {
+    var reservadas = Object.keys(FIXED).concat(['aportacion', 'traspaso']), id = base, n = 2;
+    function usado(x) { return reservadas.indexOf(x) >= 0 || findCat(cats.gasto, x) || findCat(cats.ingreso, x); }
+    while (usado(id)) id = base + '-' + (n++);
+    return id;
+  }
+  /* «Otros» se queda la última: lo nuevo entra justo antes. */
+  function posNueva(L) { var i = L.length; while (i > 0 && /^otros/.test(L[i - 1].id)) i--; return i; }
+  /* Guarda (crea o cambia) una categoría. c = {n, i, juego}; id = la que se edita (o nada si es nueva).
+     usado(id), como en catDelete, para no perder el nombre de la otra copia al dejar de ser de juego.
+     Devuelve {cats, id} o {err}. No toca la copia si hay error. */
+  function catSave(cats, tipo, c, id, usado) {
+    var otro = tipo === 'gasto' ? 'ingreso' : 'gasto', L = cats[tipo], O = cats[otro];
+    var n = String(c.n || '').replace(/\s+/g, ' ').trim(), low = n.toLowerCase(), cur = id ? findCat(L, id) : null;
+    if (!n) return { err: 'Ponle un nombre.' };
+    if (id && !cur) return { err: 'Esa categoría ya no está.' };
+    var dup = visibles(L).some(function (x) { return x !== cur && (x.n.toLowerCase() === low || fullName(x).toLowerCase() === low); });
+    if (dup) return { err: 'Ya tienes una categoría con ese nombre.' };
+    var oculta = !cur ? L.filter(function (x) { return x.oculta && x.n.toLowerCase() === low; })[0] : null;
+    if (!cur && !oculta && visibles(L).length >= MAX_CATS) return { err: 'Caben ' + MAX_CATS + ' como mucho. Borra alguna antes.' };
+    var eraJuego = !!(cur || oculta || {}).juego, copia = findCat(O, (cur || oculta || {}).id);
+    if (c.juego && !(copia && !copia.oculta) && visibles(O).length >= MAX_CATS)
+      return { err: 'En ' + (otro === 'gasto' ? 'gastos' : 'ingresos') + ' ya no caben más y una de juego va en los dos.' };
+    if (cur) { cur.n = n; if (c.i) cur.i = c.i; }
+    else if (oculta) { cur = oculta; delete cur.oculta; cur.n = n; if (c.i) cur.i = c.i; }
+    else { cur = { id: catIdLibre(cats, catSlug(n)), n: n, i: c.i || 'dots' }; L.splice(posNueva(L), 0, cur); }
+    if (c.juego) {
+      cur.juego = true;
+      if (copia) { copia.n = cur.n; copia.i = cur.i; copia.juego = true; delete copia.oculta; if (cur.grupo) copia.grupo = cur.grupo; }
+      else O.splice(posNueva(O), 0, { id: cur.id, n: cur.n, i: cur.i, juego: true });
+    } else {
+      delete cur.juego;
+      if (eraJuego && copia) {
+        if (usado && usado(cur.id)) { delete copia.juego; copia.oculta = true; } else O.splice(O.indexOf(copia), 1);
+      }
+    }
+    return { cats: cats, id: cur.id };
+  }
+  /* Borra una categoría (las dos copias si es de juego). usado(id) dice si algún movimiento o habitual la lleva:
+     entonces se oculta en vez de quitarla. */
+  function catDelete(cats, tipo, id, usado) {
+    var L = cats[tipo], c = findCat(L, id);
+    if (!c) return { err: 'Esa categoría ya no está.' };
+    if (visibles(L).length <= 1) return { err: 'Necesitas al menos una categoría de ' + (tipo === 'gasto' ? 'gasto' : 'ingreso') + '.' };
+    var listas = c.juego ? ['gasto', 'ingreso'] : [tipo], keep = !!(usado && usado(id));
+    listas.forEach(function (t) {
+      var x = findCat(cats[t], id); if (!x) return;
+      if (keep) x.oculta = true; else cats[t].splice(cats[t].indexOf(x), 1);
+    });
+    return { cats: cats };
+  }
+
   function configDoc(state) {
     var d = { v: 2, app: 'caja' };
     if (state.cats) d.cats = state.cats;
@@ -377,7 +452,8 @@
   }
 
   return {
-    VERSION: VERSION, DEF_CATS: DEF_CATS, catsOf: catsOf, catMap: catMap, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
+    VERSION: VERSION, DEF_CATS: DEF_CATS, catsAll: catsAll, catsOf: catsOf, catMap: catMap, MAX_CATS: MAX_CATS,
+    copyCats: copyCats, catSlug: catSlug, catSave: catSave, catDelete: catDelete, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
     pad2: pad2, iso: iso, today: today, parse: parse, dim: dim, addDays: addDays, diffDays: diffDays,
     startOfDay: startOfDay, monthKey: monthKey,
     parseEur: parseEur, fmtCsvEur: fmtCsvEur, parseCsvEur: parseCsvEur,

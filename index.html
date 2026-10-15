@@ -313,6 +313,15 @@ svg{display:block}
 .check input:checked+.sw::after{transform:translateX(18px)}
 .check input:focus-visible+.sw{outline:2px solid var(--accent);outline-offset:2px}
 .check small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.av svg{width:18px;height:18px}
+.row-item .chev{color:var(--muted)}
+.row-item .chev svg{width:18px;height:18px}
+.icons{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.icons button{aspect-ratio:1;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);display:grid;place-items:center;padding:0}
+.icons button svg{width:20px;height:20px}
+.icons button[aria-pressed="true"]{background:var(--sky);border-color:var(--sky);color:var(--sky-ink)}
+.sheet h3 small{font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--muted)}
+.sheet .sep{border:0;border-top:1px solid var(--hairline);margin:4px 0 0}
 
 @media (min-width:600px){
   body{background:var(--frame)}
@@ -532,9 +541,28 @@ svg{display:block}
       <h2>Ajustes</h2>
       <button type="button" class="iconbtn" data-close aria-label="Cerrar"><span data-ic="x"></span></button>
     </div>
-    <h3>Copia en GitHub</h3>
+    <h3>Categorías</h3>
+    <p class="small">Las de los botones de Apuntar: añade las tuyas, cámbiales el nombre o bórralas.</p>
+    <button type="button" class="btn ghost" data-open="cats">Cambiar categorías</button>
+    <hr class="sep">
+    <h3>Copia en un archivo</h3>
+    <p class="small" id="bk-txt"></p>
+    <div class="actions">
+      <button type="button" class="btn ghost" id="bk-save">Guardar copia</button>
+      <button type="button" class="btn ghost" id="bk-open">Recuperar copia</button>
+    </div>
+    <input type="file" id="bk-file" accept="application/json,.json" hidden>
+    <div class="choice" id="bk-choice" hidden>
+      <p id="bk-choice-txt"></p>
+      <button type="button" class="btn" id="bk-apply">Recuperar esta copia</button>
+      <button type="button" class="btn ghost" id="bk-cancel">Cancelar</button>
+    </div>
+    <p class="err" id="bk-err" role="alert"></p>
+    <hr class="sep">
+    <h3>Copia en GitHub <small>· opcional</small></h3>
+    <p class="small" id="set-intro"></p>
     <div class="status"><i class="st-dot" id="st-dot"></i><span id="st-txt"></span></div>
-    <label class="field" for="set-repo">Repositorio<input id="set-repo" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="field" for="set-repo">Repositorio<input id="set-repo" type="text" placeholder="tu-usuario/caja-datos" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <label class="field" for="set-token">Llave de GitHub<input id="set-token" type="password" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <p class="small">La llave se queda solo en este móvil. Créala con acceso únicamente a ese repositorio.</p>
     <p class="err" id="set-err" role="alert"></p>
@@ -550,7 +578,42 @@ svg{display:block}
       <button type="button" class="btn ghost" id="set-pull">Traer de GitHub</button>
     </div>
     <p class="small" id="set-link"></p>
-    <p class="small">Caja <span id="ver"></span> · Los datos viven en este móvil y en tu GitHub privado.</p>
+    <p class="small">Caja <span id="ver"></span> · <span id="set-where"></span></p>
+  </form>
+</div>
+
+<!-- Hoja: categorías -->
+<div class="overlay" id="ov-cats" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Categorías</h2>
+      <button type="button" class="iconbtn" data-close aria-label="Cerrar"><span data-ic="x"></span></button>
+    </div>
+    <div class="seg two" id="cs-tipo" role="group" aria-label="Tipo de categoría">
+      <button type="button" data-cstipo="gasto" aria-pressed="true">Gastos</button>
+      <button type="button" data-cstipo="ingreso" aria-pressed="false">Ingresos</button>
+    </div>
+    <div class="card" id="cs-list"></div>
+    <p class="small" id="cs-foot"></p>
+  </div>
+</div>
+
+<!-- Hoja: una categoría -->
+<div class="overlay" id="ov-cat" hidden>
+  <form class="sheet" id="ctf" autocomplete="off" novalidate>
+    <div class="sheet-head">
+      <h2 id="ct-title">Nueva categoría</h2>
+      <button type="button" class="iconbtn" id="ct-back" aria-label="Volver a las categorías"><span data-ic="x"></span></button>
+    </div>
+    <label class="field" for="ct-nombre">Nombre<input id="ct-nombre" type="text" maxlength="20" placeholder="Ropa"></label>
+    <p class="small" id="ct-grupo" hidden></p>
+    <div class="field"><span>Icono</span><div class="icons" id="ct-icons" role="group" aria-label="Icono"></div></div>
+    <label class="check" for="ct-juego"><input type="checkbox" id="ct-juego"><span class="sw"></span><span>Es de juego<small>Póker, apuestas…: lo que metes y lo que sacas se compensan y en Mes solo cuenta el resultado. Sale en gastos y en ingresos.</small></span></label>
+    <p class="err" id="ct-err" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="ct-del" hidden>Borrar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
   </form>
 </div>
 
@@ -560,7 +623,8 @@ svg{display:block}
 'use strict';
 var C=window.CajaCore;
 var KEY='caja-v1',TOKEN_KEY='caja-llave',API_KEY='caja-api',HINT_KEY='caja-aviso-instalar';
-var REPO_DEFAULT='tomi5855/caja-datos';
+/* Sin repositorio por defecto: cada persona pone el suyo (los móviles ya conectados lo tienen guardado). */
+var REPO_DEFAULT='';
 function $(id){return document.getElementById(id)}
 function all(sel){return [].slice.call(document.querySelectorAll(sel))}
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -601,6 +665,15 @@ var ICONS={
   clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   card:'<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
   cash:'<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  bag:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 11 5 12 8c1-3 2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  plane:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  coffee:'<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>',
+  book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  paw:'<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
+  heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  phone:'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   eyeoff:'<path d="M10.73 5.08a10.74 10.74 0 0 1 11.2 6.57 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-1.44 2.49"/><path d="M14.08 14.16a3 3 0 0 1-4.24-4.24"/><path d="M17.48 17.5a10.75 10.75 0 0 1-15.42-5.15 1 1 0 0 1 0-.7 10.75 10.75 0 0 1 4.45-5.14"/><path d="m2 2 20 20"/>'
 };
@@ -759,7 +832,8 @@ function renderEntryMeta(){
   var b=$('banner');
   if(e){b.hidden=true}
   else if(!standalone()&&lsGet(HINT_KEY)!=='1'){b.innerHTML='<span>Instálala antes de apuntar: <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</span><button class="btn-sm" type="button" id="banner-ok">Vale</button>';b.hidden=false}
-  else if(!token()){b.innerHTML='<span>Lo que apuntes solo está en este móvil.</span><button class="btn-sm" type="button" data-open="ajustes">Copia en GitHub</button>';b.hidden=false}
+  else if(copiaPendiente()){b.innerHTML='<span>'+(ultimaCopia()?'Hace más de un mes de tu última copia.':'Lo que apuntas solo está en este móvil.')+' Guarda una copia.</span><button class="btn-sm" type="button" id="banner-copia">Guardar</button>';b.hidden=false}
+  else if(!token()){b.hidden=true}
   else{var a=aviso();if(a){b.innerHTML='<span>'+esc(a.texto)+'</span><button class="btn-sm" type="button" id="aviso-ok" data-aviso="'+esc(a.id)+'">Vale</button>';b.hidden=false}else b.hidden=true}
 }
 /* Avisos que deja Claude en auto.json (por ejemplo, falta efectivo para la próxima orden). «Vale» lo oculta en este móvil. */
@@ -1078,7 +1152,7 @@ function putPath(path){
         return api('GET',path).then(function(g){
           if(g.ok)return g.json().then(function(gj){
             sha=gj.sha;
-            if(path==='config.json'){try{var rc=JSON.parse(b64dec(gj.content));if(rc.cats){S.cats=rc.cats;text=contentFor(path);persist();renderAll()}}catch(_){}}
+            if(path==='config.json'){try{var rc=JSON.parse(b64dec(gj.content));if(rc.cats&&!S.sync.catsLocal){S.cats=rc.cats;text=contentFor(path);persist();renderAll()}}catch(_){}}
             return attempt();
           });
           if(g.status===404){sha=undefined;return attempt()}
@@ -1099,7 +1173,7 @@ function syncNow(){
   paths.forEach(function(p){
     chain=chain.then(function(){
       var ver=S.sync.pend[p];if(ver==null)return;
-      return putPath(p).then(function(){if(S.sync.pend[p]===ver)delete S.sync.pend[p];persist()});
+      return putPath(p).then(function(){if(S.sync.pend[p]===ver){delete S.sync.pend[p];if(p==='config.json')delete S.sync.catsLocal}persist()});
     });
   });
   return chain.then(function(){S.sync.err=null;S.sync.last=Date.now()},function(e){S.sync.err=errCode(e)}).then(function(){
@@ -1134,7 +1208,7 @@ function pullConfig(force){
     var known=S.sync.sha['config.json'];
     if(j.sha===known&&S.cats)return;
     var cfg=JSON.parse(b64dec(j.content)),pending=S.sync.pend['config.json']!=null;
-    if(cfg.cats)S.cats=cfg.cats;
+    if(cfg.cats&&!S.sync.catsLocal)S.cats=cfg.cats;
     if(j.sha!==known&&!pending){S.cuentas=cfg.cuentas||[];S.subs=cfg.subs||[];S.saldos=cfg.saldos||[]}
     S.sync.sha['config.json']=j.sha;
     if(pending)markConfig();
@@ -1154,7 +1228,7 @@ function pullAuto(){
 }
 function applyRemote(R){
   S.movs=R.movs;if(R.auto!==undefined){S.auto=R.auto;S.sync.autoSha=R.autoSha||null}
-  if(R.cfg){S.cuentas=R.cfg.cuentas||[];S.subs=R.cfg.subs||[];S.saldos=R.cfg.saldos||[];if(R.cfg.cats)S.cats=R.cfg.cats}
+  if(R.cfg){S.cuentas=R.cfg.cuentas||[];S.subs=R.cfg.subs||[];S.saldos=R.cfg.saldos||[];if(R.cfg.cats){S.cats=R.cfg.cats;delete S.sync.catsLocal}}
   S.sync.sha=R.shas;S.sync.pend={};S.sync.err=null;S.sync.last=Date.now();
   runSubs();persist();renderAll();scheduleSync();
 }
@@ -1163,7 +1237,7 @@ function connect(){
   syncing=true;renderSync('Comprobando la llave…');
   return pullAll().then(function(R){
     syncing=false;
-    var rc=R.cfg||{};if(rc.cats)S.cats=rc.cats;if(R.auto!==undefined){S.auto=R.auto;S.sync.autoSha=R.autoSha||null}
+    var rc=R.cfg||{};if(rc.cats&&!S.sync.catsLocal)S.cats=rc.cats;if(R.auto!==undefined){S.auto=R.auto;S.sync.autoSha=R.autoSha||null}
     var remoteHas=!!(R.movs.length||(rc.cuentas||[]).length||(rc.subs||[]).length),localHas=!!(S.movs.length||S.cuentas.length||S.subs.length);
     S.sync.err=null;
     if(remoteHas&&!localHas){applyRemote(R);toast('Datos traídos de GitHub');return}
@@ -1187,15 +1261,133 @@ function syncState(){
 function renderSync(msg){
   var st=syncState();
   $('st-dot').className='st-dot '+st.k;$('st-txt').textContent=msg||st.t;
-  var d=$('gear-dot');d.hidden=!(st.k==='none'||st.k==='wait'||st.k==='bad');d.className=st.k==='bad'?'bad':'wait';
+  var d=$('gear-dot');d.hidden=!((st.k==='none'&&copiaPendiente())||st.k==='wait'||st.k==='bad');d.className=st.k==='bad'?'bad':'wait';
+  $('set-where').textContent=token()?'Los datos viven en este móvil y en tu GitHub privado.':'Los datos viven solo en este móvil.';
+  $('set-intro').textContent=token()?'Cada cambio se sube solo a tu repositorio privado.':'Si tienes cuenta de GitHub, cada cambio se sube solo a un repositorio privado tuyo. Si no, con la copia en un archivo te basta.';
   var repo=S.sync.repo;$('set-link').innerHTML=token()?'Tus datos: <a href="https://github.com/'+esc(repo)+'" target="_blank" rel="noopener">github.com/'+esc(repo)+'</a>':'';
 }
 function openAjustes(){
   $('set-repo').value=S.sync.repo;$('set-token').value='';
   $('set-token').placeholder=token()?'Llave guardada (déjalo vacío para mantenerla)':'github_pat_…';
   ui.pullArm=false;$('set-pull').textContent='Traer de GitHub';$('set-err').textContent='';
-  $('set-choice').hidden=!ui.remote;$('ver').textContent='v'+C.VERSION;renderSync();openSheet('ov-set');
+  $('set-choice').hidden=!ui.remote;$('ver').textContent='v'+C.VERSION;ui.restore=null;renderBackup();renderSync();openSheet('ov-set');
 }
+
+/* ---------- Categorías (v1.7): se cambian desde Ajustes ----------
+   Se guardan en S.cats (config.json). Mientras no se han subido, mandan las del móvil (S.sync.catsLocal). */
+var ICON_PICK=[['utensils','cubiertos'],['coffee','café'],['bag','bolsa'],['ticket','entrada'],['car','coche'],['fuel','gasolina'],['home','casa'],
+  ['pill','pastilla'],['pulse','pulso'],['sparkles','destellos'],['laptop','portátil'],['phone','móvil'],['book','libro'],['plane','avión'],
+  ['gift','regalo'],['paw','huella'],['heart','corazón'],['music','música'],['star','estrella'],['briefcase','maletín'],['cash','billete'],
+  ['card','tarjeta'],['percent','porcentaje'],['calculator','calculadora'],['spade','picas'],['dice','dado'],['trend','gráfica'],['dots','puntos']];
+function catUsada(id){
+  if(C.allMovs(S).some(function(m){return m.cat===id}))return true;
+  return S.subs.some(function(x){return x.cat===id||(id==='trabajo'&&x.trabajo)});
+}
+function setCats(cats){S.cats=cats;S.sync.catsLocal=Date.now();markConfig();changed()}
+function openCats(tipo){ui.catsTipo=tipo||ui.catsTipo||'gasto';renderCatsList();openSheet('ov-cats')}
+function renderCatsList(){
+  var t=ui.catsTipo,L=C.catsOf(S)[t],full=L.length>=C.MAX_CATS;
+  all('#cs-tipo button').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-cstipo')===t))});
+  $('cs-list').innerHTML=L.map(function(c){
+    var meta=c.juego?'Juego · cuenta en neto':c.grupo?'Va con '+c.grupo:'';
+    return '<button type="button" class="row-item" data-catedit="'+esc(c.id)+'"><span class="av">'+svg(c.i)+'</span><span class="t"><b>'+esc(C.fullName(c))+'</b>'+(meta?'<small>'+esc(meta)+'</small>':'')+'</span><span class="r chev">'+svg('right')+'</span></button>';
+  }).join('')+(full?'':'<button type="button" class="addrow" data-catnew><span class="ic">'+svg('plus')+'</span>Añadir categoría</button>');
+  $('cs-foot').textContent=(full?'Caben '+C.MAX_CATS+' como mucho: para añadir otra, borra alguna. ':'')+'Así salen en Apuntar. Si borras una que ya has usado, sigue saliendo con su nombre en los meses en que la usaste.';
+}
+function findCatV(id){var L=C.catsOf(S)[ui.catsTipo];for(var i=0;i<L.length;i++)if(L[i].id===id)return L[i];return null}
+function openCat(id){
+  var c=id?findCatV(id):null,t=ui.catsTipo;
+  ui.catEdit=c?c.id:null;ui.catIcon=c?c.i:'dots';
+  $('ct-title').textContent=c?C.fullName(c):t==='gasto'?'Nueva de gasto':'Nueva de ingreso';
+  $('ct-nombre').value=c?c.n:'';$('ct-nombre').placeholder=t==='gasto'?'Ropa':'Clases';
+  $('ct-grupo').hidden=!(c&&c.grupo);$('ct-grupo').textContent=c&&c.grupo?'Va con «'+c.grupo+'»: en Mes se suma con las demás de '+c.grupo+'.':'';
+  $('ct-juego').checked=!!(c&&c.juego);
+  $('ct-del').hidden=!c;$('ct-err').textContent='';
+  renderIconPick();openSheet('ov-cat');
+}
+function renderIconPick(){
+  $('ct-icons').innerHTML=ICON_PICK.map(function(k){return '<button type="button" data-icon="'+k[0]+'" aria-pressed="'+(k[0]===ui.catIcon)+'" aria-label="'+k[1]+'">'+svg(k[0])+'</button>'}).join('');
+}
+$('ctf').addEventListener('submit',function(e){
+  e.preventDefault();
+  var r=C.catSave(C.copyCats(S),ui.catsTipo,{n:$('ct-nombre').value,i:ui.catIcon,juego:$('ct-juego').checked},ui.catEdit,catUsada);
+  if(r.err){$('ct-err').textContent=r.err;return}
+  var nueva=!ui.catEdit;setCats(r.cats);openCats();toast(nueva?'Categoría añadida':'Cambios guardados');
+});
+$('ct-del').addEventListener('click',function(){
+  var c=findCatV(ui.catEdit);if(!c)return;
+  var antes=C.copyCats(S),r=C.catDelete(C.copyCats(S),ui.catsTipo,c.id,catUsada);
+  if(r.err){$('ct-err').textContent=r.err;return}
+  setCats(r.cats);openCats();
+  toast('Borrada: '+C.fullName(c),function(){setCats(antes);if(!$('ov-cats').hidden)renderCatsList()});
+});
+$('ct-back').addEventListener('click',function(){openCats()});
+
+/* ---------- Copia en un archivo (v1.7) ----------
+   Para quien no usa GitHub: un archivo con todo (movimientos, cuentas, habituales, saldos y categorías) que se guarda
+   en Archivos o iCloud Drive y se recupera aquí, en este móvil o en otro. La fecha de la última copia vive en este móvil. */
+var BACKUP_KEY='caja-ultima-copia',MES_MS=30*86400000;
+function ultimaCopia(){var v=+lsGet(BACKUP_KEY);return v>0?v:0}
+function copiaPendiente(){if(token())return false;var u=ultimaCopia();return u?Date.now()-u>MES_MS:S.movs.length>=10}
+function esIOS(){var n=navigator;return /iPad|iPhone|iPod/.test(n.userAgent)||(n.platform==='MacIntel'&&n.maxTouchPoints>1)}
+function fechaLarga(ts){var d=new Date(ts);return d.getDate()+' de '+MESES[d.getMonth()]+(d.getFullYear()!==new Date().getFullYear()?' de '+d.getFullYear():'')}
+function copiaDoc(){return JSON.stringify({app:'caja',copia:1,version:C.VERSION,creada:new Date().toISOString(),config:JSON.parse(C.configDoc(S)),movs:S.movs})}
+function renderBackup(){
+  var u=ultimaCopia();
+  $('bk-txt').textContent=token()
+    ?'Tus datos ya se copian solos en GitHub. Un archivo te sirve de copia extra.'+(u?' Última: el '+fechaLarga(u)+'.':'')
+    :'Lo que apuntas solo está en este móvil. Guarda una copia cada mes en Archivos o iCloud Drive; si cambias de móvil, la recuperas aquí. '+(u?'Última: el '+fechaLarga(u)+'.':'Aún no has guardado ninguna.');
+  $('bk-choice').hidden=!ui.restore;$('bk-err').textContent='';
+}
+function guardarCopia(){
+  var name='caja-copia-'+today()+'.json',blob=new Blob([copiaDoc()],{type:'application/json'}),file=null;
+  function hecho(){lsSet(BACKUP_KEY,String(Date.now()));if(!$('ov-set').hidden)renderBackup();renderEntryMeta();renderSync();toast('Copia guardada')}
+  function descargar(){var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},5000);hecho()}
+  try{file=new File([blob],name,{type:'application/json'})}catch(_){}
+  /* En el iPhone, la app instalada no descarga bien: se abre la hoja de Compartir → «Guardar en Archivos». */
+  if(esIOS()&&file&&navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'Copia de Caja'}).then(hecho,function(e){if(e&&e.name==='AbortError')return;descargar()});
+    return;
+  }
+  descargar();
+}
+function leerCopia(txt){
+  var o;try{o=JSON.parse(txt)}catch(_){return null}
+  if(!o||o.app!=='caja'||!o.copia||!o.config||!Array.isArray(o.movs))return null;
+  var cfg=o.config,cats=cfg.cats&&Array.isArray(cfg.cats.gasto)&&Array.isArray(cfg.cats.ingreso)?cfg.cats:null;
+  var movs=o.movs.filter(function(m){return m&&typeof m.id==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(m.fecha||'')&&typeof m.importe==='number'&&!!m.tipo});
+  return {creada:o.creada,movs:movs,cuentas:Array.isArray(cfg.cuentas)?cfg.cuentas:[],subs:Array.isArray(cfg.subs)?cfg.subs:[],saldos:Array.isArray(cfg.saldos)?cfg.saldos:[],cats:cats};
+}
+function recuperarCopia(R){
+  S.movs=R.movs;S.cuentas=R.cuentas;S.subs=R.subs;S.saldos=R.saldos;
+  if(R.cats){S.cats=R.cats;S.sync.catsLocal=Date.now()}else{delete S.cats;delete S.sync.catsLocal}
+  ui.editing=null;resetEntry();
+  if(token())markAll();
+  runSubs();persist();renderAll();scheduleSync();
+}
+$('bk-save').addEventListener('click',guardarCopia);
+$('bk-open').addEventListener('click',function(){$('bk-err').textContent='';$('bk-file').value='';$('bk-file').click()});
+$('bk-file').addEventListener('change',function(){
+  var f=this.files&&this.files[0];if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var R=leerCopia(String(rd.result||''));
+    if(!R){ui.restore=null;renderBackup();$('bk-err').textContent='Ese archivo no es una copia de Caja.';return}
+    ui.restore=R;
+    var n=R.movs.length,k=R.cuentas.length;
+    $('bk-choice-txt').textContent='Copia'+(R.creada?' del '+fechaLarga(Date.parse(R.creada)):'')+': '+n+(n===1?' movimiento':' movimientos')+' y '+k+(k===1?' cuenta':' cuentas')+'. Sustituye lo que hay ahora en este móvil'+(token()?' y se sube a GitHub.':'.');
+    renderBackup();
+  };
+  rd.onerror=function(){$('bk-err').textContent='No he podido leer el archivo.'};
+  rd.readAsText(f);
+});
+$('bk-cancel').addEventListener('click',function(){ui.restore=null;renderBackup()});
+$('bk-apply').addEventListener('click',function(){
+  var R=ui.restore;if(!R)return;
+  var antes=leerCopia(copiaDoc());
+  ui.restore=null;recuperarCopia(R);closeSheets();
+  toast('Copia recuperada: '+R.movs.length+(R.movs.length===1?' movimiento':' movimientos'),function(){recuperarCopia(antes)});
+});
 
 /* ---------- Aviso con deshacer ---------- */
 var toastT=null,undoFn=null;
@@ -1237,7 +1429,7 @@ all('#pad .key').forEach(function(key){
 document.addEventListener('click',function(e){
   var t=e.target&&e.target.closest?e.target.closest('button'):null;if(!t)return;
   if(t.hasAttribute('data-go')){var to=t.getAttribute('data-go');if(ui.editing&&to!=='apuntar')resetEntry();closeSheets();go(to);return}
-  if(t.hasAttribute('data-open')){var o=t.getAttribute('data-open');if(o==='ajustes')openAjustes();else if(o==='cuenta')openCuenta(null);else if(o==='sub')openSub(null,'gasto');else if(o==='ing')openSub(null,'ingreso');else if(o==='mover')openMover(null);return}
+  if(t.hasAttribute('data-open')){var o=t.getAttribute('data-open');if(o==='ajustes')openAjustes();else if(o==='cats')openCats('gasto');else if(o==='cuenta')openCuenta(null);else if(o==='sub')openSub(null,'gasto');else if(o==='ing')openSub(null,'ingreso');else if(o==='mover')openMover(null);return}
   if(t.hasAttribute('data-close')){closeSheets();return}
   if(t.hasAttribute('data-priv')){lsSet(PRIV_KEY,privOn()?null:'1');renderPriv();return}
   if(t.hasAttribute('data-k')){if(e.detail===0)press(t.getAttribute('data-k'));return}
@@ -1253,6 +1445,11 @@ document.addEventListener('click',function(e){
   if(t.hasAttribute('data-cada')){ui.subCada=t.getAttribute('data-cada');syncCada();return}
   if(t.hasAttribute('data-ctipo')){ui.ctaTipo=t.getAttribute('data-ctipo');syncCtaTipo();return}
   if(t.id==='banner-ok'){lsSet(HINT_KEY,'1');renderEntryMeta();return}
+  if(t.id==='banner-copia'){guardarCopia();return}
+  if(t.hasAttribute('data-cstipo')){ui.catsTipo=t.getAttribute('data-cstipo');renderCatsList();return}
+  if(t.hasAttribute('data-catedit')){openCat(t.getAttribute('data-catedit'));return}
+  if(t.hasAttribute('data-catnew')){openCat(null);return}
+  if(t.hasAttribute('data-icon')){ui.catIcon=t.getAttribute('data-icon');renderIconPick();return}
 });
 all('.overlay').forEach(function(o){o.addEventListener('click',function(e){if(e.target===o)closeSheets()})});
 document.addEventListener('change',function(e){if(e.target&&e.target.id==='tr-todo')ui.trTodo=e.target.checked});
@@ -1347,7 +1544,7 @@ $('mf-del').addEventListener('click',function(){
 $('setf').addEventListener('submit',function(e){
   e.preventDefault();
   var tk=$('set-token').value.trim(),repo=$('set-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/\/+$/,'');
-  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){$('set-err').textContent='El repositorio va como usuario/nombre, por ejemplo tomi5855/caja-datos.';return}
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){$('set-err').textContent='El repositorio va como usuario/nombre, por ejemplo tu-usuario/caja-datos.';return}
   if(!tk&&!token()){$('set-err').textContent='Pega la llave de GitHub.';return}
   $('set-err').textContent='';
   if(tk)lsSet(TOKEN_KEY,tk);

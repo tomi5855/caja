@@ -227,6 +227,70 @@ t('categorías: por defecto y las del repositorio privado', () => {
   assert.ok(!C.configDoc({ cuentas: [], subs: [], saldos: [] }).includes('"cats"'));
 });
 
+t('categorías: crear, cambiar y borrar desde el móvil (v1.7)', () => {
+  // sin categorías propias se parte de las genéricas
+  let cats = C.copyCats({});
+  assert.strictEqual(cats.gasto.length, C.DEF_CATS.gasto.length);
+  assert.notStrictEqual(cats.gasto[0], C.DEF_CATS.gasto[0]); // es una copia, no toca las de serie
+  // nueva: entra antes de «Otros», con id sin tildes
+  let r = C.catSave(cats, 'gasto', { n: '  Ropa  y   zapatos ', i: 'bag' });
+  assert.ok(!r.err);
+  assert.strictEqual(r.id, 'ropa-y-zapatos');
+  assert.strictEqual(cats.gasto[cats.gasto.length - 2].n, 'Ropa y zapatos');
+  assert.strictEqual(cats.gasto[cats.gasto.length - 1].id, 'otros');
+  assert.strictEqual(C.catSlug('Formación'), 'formacion');
+  // nombre repetido (sin mirar mayúsculas) y sin nombre
+  assert.ok(C.catSave(cats, 'gasto', { n: 'comidas' }).err);
+  assert.ok(C.catSave(cats, 'gasto', { n: '   ' }).err);
+  // id ocupado: se numera; tampoco pisa las fijas
+  r = C.catSave(cats, 'ingreso', { n: 'Comidas', i: 'utensils' });
+  assert.strictEqual(r.id, 'comidas-2');
+  assert.strictEqual(C.catSave(cats, 'gasto', { n: 'Suscripciones' }).id, 'suscripciones-2');
+  C.catDelete(cats, 'gasto', 'suscripciones-2'); // sin movimientos: se quita del todo
+  assert.ok(!cats.gasto.some(c => c.id === 'suscripciones-2'));
+  // cambiar nombre e icono mantiene el id (el historial cambia de nombre con ella)
+  r = C.catSave(cats, 'gasto', { n: 'Ropa', i: 'gift' }, 'ropa-y-zapatos');
+  assert.strictEqual(r.id, 'ropa-y-zapatos');
+  assert.strictEqual(C.catMap({ cats })['ropa-y-zapatos'].n, 'Ropa');
+  // juego: va en las dos listas con el mismo id
+  r = C.catSave(cats, 'gasto', { n: 'Lotería', i: 'star', juego: true });
+  assert.strictEqual(r.id, 'loteria');
+  assert.ok(cats.ingreso.some(c => c.id === 'loteria' && c.juego));
+  assert.deepStrictEqual(C.juegoIds({ cats }), ['loteria']);
+  // renombrar desde ingresos cambia también la de gastos
+  C.catSave(cats, 'ingreso', { n: 'Loterías', i: 'star', juego: true }, 'loteria');
+  assert.strictEqual(cats.gasto.find(c => c.id === 'loteria').n, 'Loterías');
+  // borrar sin movimientos la quita de las dos; con movimientos solo la oculta
+  let dd = JSON.parse(JSON.stringify(cats));
+  C.catDelete(dd, 'gasto', 'loteria', () => false);
+  assert.ok(!dd.gasto.some(c => c.id === 'loteria') && !dd.ingreso.some(c => c.id === 'loteria'));
+  C.catDelete(cats, 'gasto', 'loteria', id => id === 'loteria');
+  assert.ok(cats.gasto.find(c => c.id === 'loteria').oculta && cats.ingreso.find(c => c.id === 'loteria').oculta);
+  assert.ok(!C.catsOf({ cats }).gasto.some(c => c.id === 'loteria'));       // no sale en los botones
+  assert.strictEqual(C.catMap({ cats }).loteria.n, 'Loterías');               // pero el historial la nombra
+  assert.deepStrictEqual(C.juegoIds({ cats }), ['loteria']);                // y lo apuntado sigue en neto
+  // volver a crearla con el mismo nombre la recupera (mismo id)
+  r = C.catSave(cats, 'gasto', { n: 'loterías', i: 'dice', juego: true });
+  assert.strictEqual(r.id, 'loteria');
+  assert.ok(!cats.gasto.find(c => c.id === 'loteria').oculta && !cats.ingreso.find(c => c.id === 'loteria').oculta);
+  // dejar de ser de juego: la copia de ingresos se va (u oculta si tiene movimientos)
+  C.catSave(cats, 'gasto', { n: 'Loterías', i: 'dice', juego: false }, 'loteria', id => id === 'loteria');
+  assert.ok(!cats.gasto.find(c => c.id === 'loteria').juego);
+  assert.ok(cats.ingreso.find(c => c.id === 'loteria').oculta);
+  assert.deepStrictEqual(C.juegoIds({ cats }), []);
+  // máximo de 12 por lista y al menos una
+  let few = { gasto: [{ id: 'a', n: 'A', i: 'dots' }], ingreso: [{ id: 'b', n: 'B', i: 'dots' }] };
+  assert.ok(C.catDelete(few, 'gasto', 'a').err);
+  for (let i = 1; i < C.MAX_CATS; i++) assert.ok(!C.catSave(few, 'gasto', { n: 'G' + i }).err);
+  assert.ok(C.catSave(few, 'gasto', { n: 'Una más' }).err);
+  assert.ok(C.catSave(few, 'ingreso', { n: 'Juego', juego: true }).err); // no cabe su copia en gastos
+  // las categorías con grupo se conservan al cambiarles el nombre
+  let g = { gasto: [{ id: 'x', n: 'X', i: 'dots' }], ingreso: [{ id: 'nomina', n: 'Nómina', i: 'briefcase', grupo: 'Bar' }, { id: 'o', n: 'Otros', i: 'dots' }] };
+  C.catSave(g, 'ingreso', { n: 'Sueldo', i: 'briefcase' }, 'nomina');
+  assert.strictEqual(C.fullName(g.ingreso[0]), 'Sueldo Bar');
+  assert.ok(C.catSave(g, 'ingreso', { n: 'sueldo bar' }).err);
+});
+
 t('resumen del mes con el juego en neto', () => {
   const L = [
     { tipo: 'ingreso', cat: 'sueldo', importe: 100000 }, { tipo: 'gasto', cat: 'comidas', importe: 3000 },
