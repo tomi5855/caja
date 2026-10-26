@@ -278,7 +278,7 @@ t('categorías: crear, cambiar y borrar desde el móvil (v1.7)', () => {
   assert.ok(!cats.gasto.find(c => c.id === 'loteria').juego);
   assert.ok(cats.ingreso.find(c => c.id === 'loteria').oculta);
   assert.deepStrictEqual(C.juegoIds({ cats }), []);
-  // máximo de 12 por lista y al menos una
+  // máximo de 16 por lista y al menos una
   let few = { gasto: [{ id: 'a', n: 'A', i: 'dots' }], ingreso: [{ id: 'b', n: 'B', i: 'dots' }] };
   assert.ok(C.catDelete(few, 'gasto', 'a').err);
   for (let i = 1; i < C.MAX_CATS; i++) assert.ok(!C.catSave(few, 'gasto', { n: 'G' + i }).err);

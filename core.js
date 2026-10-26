@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.7.0';
+  var VERSION = '1.7.1';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -155,7 +155,7 @@
      Se trabaja sobre una copia ({gasto, ingreso}) y la app la guarda en state.cats (config.json).
      Una categoría de juego va en las dos listas con el mismo id: se mete como gasto y se saca como ingreso.
      Borrar una que ya tiene movimientos solo la oculta, para que el historial siga teniendo su nombre. */
-  var MAX_CATS = 12;
+  var MAX_CATS = 16;
   function copyCats(state) {
     var a = catsAll(state);
     function cp(L) { return L.map(function (c) { return JSON.parse(JSON.stringify(c)); }); }

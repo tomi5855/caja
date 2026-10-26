@@ -39,7 +39,7 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
 
 ## Categorías desde el móvil y copia en un archivo (v1.7)
 
-- **Ajustes → Cambiar categorías:** añadir (12 como mucho por lista), cambiar nombre e icono, marcar «Es de juego»
+- **Ajustes → Cambiar categorías:** añadir (16 como mucho por lista; desde la 1.7.1), cambiar nombre e icono, marcar «Es de juego»
   (va en las dos listas con el mismo id) y borrar. Borrar una que ya tiene movimientos o habituales solo la oculta
   (`oculta: true`): no sale en los botones, pero el historial sigue diciendo su nombre y, si era de juego, sigue en neto.
   Se guardan en `cats` de `config.json`. Mientras un cambio hecho en el móvil no se ha subido, las categorías del

@@ -667,6 +667,7 @@ var ICONS={
   cash:'<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
   bag:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
   gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 11 5 12 8c1-3 2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  bus:'<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
   plane:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
   coffee:'<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>',
   book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
@@ -1276,7 +1277,7 @@ function openAjustes(){
 /* ---------- Categorías (v1.7): se cambian desde Ajustes ----------
    Se guardan en S.cats (config.json). Mientras no se han subido, mandan las del móvil (S.sync.catsLocal). */
 var ICON_PICK=[['utensils','cubiertos'],['coffee','café'],['bag','bolsa'],['ticket','entrada'],['car','coche'],['fuel','gasolina'],['home','casa'],
-  ['pill','pastilla'],['pulse','pulso'],['sparkles','destellos'],['laptop','portátil'],['phone','móvil'],['book','libro'],['plane','avión'],
+  ['pill','pastilla'],['pulse','pulso'],['sparkles','destellos'],['laptop','portátil'],['phone','móvil'],['book','libro'],['bus','autobús'],['plane','avión'],
   ['gift','regalo'],['paw','huella'],['heart','corazón'],['music','música'],['star','estrella'],['briefcase','maletín'],['cash','billete'],
   ['card','tarjeta'],['percent','porcentaje'],['calculator','calculadora'],['spade','picas'],['dice','dado'],['trend','gráfica'],['dots','puntos']];
 function catUsada(id){
