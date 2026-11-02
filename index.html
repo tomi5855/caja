@@ -350,6 +350,22 @@ svg{display:block}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* Detalle de categoría (v1.10) */
+button.catrow,button.jrow{width:100%;border:0;background:none;text-align:left;color:var(--fg);font:inherit;padding-inline:0;cursor:pointer}
+button.catrow:active,button.jrow:active{opacity:.6}
+.det-big{font-family:var(--font-display);font-size:46px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.det-big small{display:block;font-family:var(--font-body);font-size:13px;font-weight:400;color:var(--muted);margin-top:4px}
+.det-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.det-m div{background:var(--surface2);border-radius:12px;padding:9px 10px;font-size:12px;color:var(--muted);min-width:0}
+.det-m b{display:block;font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
+.det-m small{font-size:11px}
+.det-prev{margin:-2px 2px 0}
+.drow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--hairline);font-size:14px}
+.drow .dn{min-width:0;display:flex;flex-direction:column;overflow:hidden;text-overflow:ellipsis}
+.drow small{color:var(--muted);font-size:12px}
+.drow b{font-family:var(--font-display);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+#det .day{padding-top:10px}
+
 /* ---------- Diseños (v1.9): «Clásico» es el de siempre; los demás son cristal y se eligen en Ajustes → Diseño ----------
    Un diseño es un bloque de variables (colores, letra, redondez) y una capa común de cristal. Se guarda solo en este móvil. */
 .skins{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -381,6 +397,7 @@ html[data-skin] .btn{border-radius:var(--k-r2);background:var(--k-on);color:var(
 html[data-skin] .btn.ghost,html[data-skin] .btn.danger{background:transparent;color:var(--fg)}
 html[data-skin] .btn.danger{color:var(--danger)}
 html[data-skin] .h2btn,html[data-skin] .tag,html[data-skin] .when,html[data-skin] .auto{border-radius:999px}
+html[data-skin] .det-m div{border-radius:var(--k-r3)}
 html[data-skin] .sheet{border-radius:var(--k-r) var(--k-r) 0 0;border:1px solid var(--k-edge);border-bottom:0;-webkit-backdrop-filter:blur(24px) saturate(1.5);backdrop-filter:blur(24px) saturate(1.5)}
 html[data-skin] .sheet .iconbtn{background:var(--surface2);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
 html[data-skin] .field input,html[data-skin] .field select{border-radius:var(--k-r3);background:var(--surface2);border-color:var(--hairline)}
@@ -597,6 +614,11 @@ html[data-skin] .gear i{border-color:transparent}
       <button type="submit" class="btn">Guardar</button>
     </div>
   </form>
+</div>
+
+<!-- Hoja: detalle de una categoría -->
+<div class="overlay" id="ov-det" hidden>
+  <div class="sheet" id="det"></div>
 </div>
 
 <!-- Hoja: ajustes -->
@@ -1027,7 +1049,8 @@ function renderMes(){
   var keys=Object.keys(by).sort(function(a,b){return by[b]-by[a]}),max=keys.length?by[keys[0]]:0;
   $('mes-cats-total').innerHTML=T.gasto?M(eur(T.gasto)):'';
   $('mes-cats').innerHTML=keys.length?keys.map(function(k){var c=k==='__juego'?{n:'Juego (resultado)',i:'dice'}:(cm[k]||{n:k,i:'dots'});
-    return '<div class="catrow"><span class="ic">'+svg(c.i)+'</span><span class="nm">'+esc(c.n)+'<span class="pc">'+pct(by[k]/T.gasto)+'</span></span><span class="amt">'+M(eur(by[k]))+'</span><span class="bar"><i style="width:'+(by[k]/max*100).toFixed(1)+'%"></i></span></div>';
+    var inner='<span class="ic">'+svg(c.i)+'</span><span class="nm">'+esc(c.n)+'<span class="pc">'+pct(by[k]/T.gasto)+'</span></span><span class="amt">'+M(eur(by[k]))+'</span><span class="bar"><i style="width:'+(by[k]/max*100).toFixed(1)+'%"></i></span>';
+    return k==='__juego'?'<div class="catrow">'+inner+'</div>':'<button type="button" class="catrow" data-detail="gas:'+esc(k)+'" data-dtitle="'+esc(c.n)+'" aria-label="Ver el detalle de '+esc(c.n)+'">'+inner+'</button>';
   }).join(''):'<p class="empty">Sin gastos en '+MESES[m]+'.</p>';
 
   /* Ingresos por categoría; las del mismo grupo (nómina y extras de un mismo sitio) en una fila con su detalle. */
@@ -1035,7 +1058,8 @@ function renderMes(){
   $('mes-ing-total').innerHTML=T.ingreso?M(eur(T.ingreso)):'';
   $('mes-ing').innerHTML=IR.map(function(r){
     var det=r.grupo?r.partes.map(function(p){return esc(p.n)+' '+M(eur(p.v))}).join(' · '):'';
-    return '<div class="jrow"><span class="ic">'+svg(r.i)+'</span><span class="t"><b>'+esc(r.n)+'</b>'+(det?'<small>'+det+'</small>':'')+'</span><span class="amt">'+M(eur(r.v))+'</span></div>';
+    var inner='<span class="ic">'+svg(r.i)+'</span><span class="t"><b>'+esc(r.n)+'</b>'+(det?'<small>'+det+'</small>':'')+'</span><span class="amt">'+M(eur(r.v))+'</span>';
+    return r.partes.length?'<button type="button" class="jrow" data-detail="ing:'+esc(r.partes.map(function(p){return p.id}).join(','))+'" data-dtitle="'+esc(r.n)+'" aria-label="Ver el detalle de '+esc(r.n)+'">'+inner+'</button>':'<div class="jrow">'+inner+'</div>';
   }).join('');
 
   var J=T.juego;$('mes-juego-sec').hidden=!J.n;
@@ -1051,6 +1075,38 @@ function renderMes(){
   L.forEach(function(x){if(!g||g.f!==x.fecha){g={f:x.fecha,items:[],sum:0};groups.push(g)}g.items.push(x);if(x.tipo==='gasto')g.sum+=x.importe});
   $('mes-count').textContent=L.length?L.length+(L.length===1?' movimiento':' movimientos'):'';
   $('mes-list').innerHTML=groups.length?groups.map(function(gr){return '<div class="day"><span>'+dayLabel(gr.f)+'</span><span>'+(gr.sum?M(eur(gr.sum)):'')+'</span></div><div class="card">'+gr.items.map(movRow).join('')+'</div>'}).join(''):'<p class="empty">Nada apuntado en '+MESES[m]+'.</p>';
+}
+
+/* ---------- Detalle de una categoría del mes (v1.10) ----------
+   Al tocar una fila de «En qué se va» o de «Ingresos»: total, apuntes, media, el mayor, comparación con el mes anterior,
+   dónde (por nota) y día a día. Tocar un apunte lo edita, como en la lista del mes. */
+function sumCat(ym,tipo,ids){return monthMovs(ym).filter(function(x){return x.tipo===tipo&&ids.indexOf(x.cat)>=0})}
+function openDetalle(kind,ids,title){
+  var y=ui.mesY,m=ui.mesM,ym=y+'-'+C.pad2(m+1),tipo=kind==='ing'?'ingreso':'gasto',cm=cmap();
+  var L=sumCat(ym,tipo,ids);if(!L.length)return;
+  var tot=0,max=L[0],days={},by={},ord=[];
+  L.forEach(function(x){
+    tot+=x.importe;if(x.importe>max.importe)max=x;days[x.fecha]=1;
+    var lab=(x.nota||'').trim()||(ids.length>1?(cm[x.cat]||{n:x.cat}).n:'Sin nota'),k=lab.toLowerCase();
+    if(!by[k]){by[k]={n:lab,c:0,v:0};ord.push(k)}by[k].c++;by[k].v+=x.importe;
+  });
+  ord.sort(function(a,b){return by[b].v-by[a].v});
+  var nd=Object.keys(days).length,py=m===0?y-1:y,pm=m===0?11:m-1,pt=0;
+  sumCat(py+'-'+C.pad2(pm+1),tipo,ids).forEach(function(x){pt+=x.importe});
+  var h='<div class="sheet-head"><h2>'+esc(title)+'</h2><button type="button" class="iconbtn" data-close aria-label="Cerrar"><span data-ic="x"></span></button></div>';
+  h+='<div class="det-big">'+M(eur(tot))+'<small>'+(tipo==='ingreso'?'ingresado':'gastado')+' en '+MESES[m]+'</small></div>';
+  h+='<div class="det-m"><div>Apuntes<b>'+L.length+'</b><small>en '+nd+(nd===1?' día':' días')+'</small></div><div>Media<b>'+M(eur(Math.round(tot/L.length)))+'</b><small>por apunte</small></div><div>El mayor<b>'+M(eur(max.importe))+'</b><small>'+esc(dayLabel(max.fecha))+'</small></div></div>';
+  if(pt>0){var d=tot-pt;h+='<p class="small det-prev">'+cap(MESES[pm])+': '+M(eur(pt))+' · '+(d===0?'igual':(d>0?'+':'−')+M(eur(Math.abs(d))))+'</p>'}
+  else h+='<p class="small det-prev">En '+MESES[pm]+' no hubo apuntes de esto.</p>';
+  if(ord.length>1||by[ord[0]].n!=='Sin nota'){
+    h+='<h3>Dónde</h3><div class="card">'+ord.slice(0,8).map(function(k){var o=by[k];return '<div class="drow"><span class="dn">'+esc(o.n)+(o.c>1?'<small>'+o.c+' veces</small>':'')+'</span><b>'+M(eur(o.v))+'</b></div>'}).join('')+'</div>';
+  }
+  var S2=L.slice().sort(function(a,b){if(a.fecha!==b.fecha)return a.fecha<b.fecha?1:-1;return (b.creado||0)-(a.creado||0)}),gs=[],g=null;
+  S2.forEach(function(x){if(!g||g.f!==x.fecha){g={f:x.fecha,items:[],sum:0};gs.push(g)}g.items.push(x);g.sum+=x.importe});
+  h+='<h3>Día a día</h3>'+gs.map(function(gr){return '<div class="day"><span>'+dayLabel(gr.f)+'</span><span>'+M(eur(gr.sum))+'</span></div><div class="card">'+gr.items.map(movRow).join('')+'</div>'}).join('');
+  $('det').innerHTML=h;
+  all('#det [data-ic]').forEach(function(el){el.outerHTML=svg(el.getAttribute('data-ic'))});
+  openSheet('ov-det');$('det').scrollTop=0;
 }
 
 /* ---------- Patrimonio ----------
@@ -1549,7 +1605,8 @@ document.addEventListener('click',function(e){
   if(t.id==='tr-back'){ui.trOrig=null;ui.trTodo=false;renderCats();renderAmount();return}
   if(t.id==='aviso-ok'){var v=avisosVistos();v.push(t.getAttribute('data-aviso'));lsSet(AVISOS_KEY,JSON.stringify(v.slice(-50)));renderEntryMeta();return}
   if(t.hasAttribute('data-autoinfo')){toast('Lo apuntó Claude'+(t.getAttribute('data-autoinfo')?' ('+t.getAttribute('data-autoinfo')+')':'')+'. Si está mal, díselo.');return}
-  if(t.hasAttribute('data-id')){startEdit(t.getAttribute('data-id'));return}
+  if(t.hasAttribute('data-detail')){var dd=t.getAttribute('data-detail'),ix=dd.indexOf(':');openDetalle(dd.slice(0,ix),dd.slice(ix+1).split(','),t.getAttribute('data-dtitle')||'');return}
+  if(t.hasAttribute('data-id')){closeSheets();startEdit(t.getAttribute('data-id'));return}
   if(t.hasAttribute('data-subedit')){openSub(t.getAttribute('data-subedit'));return}
   if(t.hasAttribute('data-cuenta')){openCuenta(t.getAttribute('data-cuenta'));return}
   if(t.hasAttribute('data-cada')){ui.subCada=t.getAttribute('data-cada');syncCada();return}

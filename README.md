@@ -60,3 +60,8 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
   suave y Aurora naranja). Cada diseño es un bloque `html[data-skin=…]` de variables más una capa común de cristal; se guarda
   solo en el móvil (`localStorage` `caja-skin`) y la letra del diseño se pide a Google Fonts solo al elegirlo.
 - El aviso de instalar distingue iPhone/iPad (Compartir), Android (menú) y ordenador (sin aviso).
+
+## Detalle de una categoría (v1.10)
+
+En **Mes**, tocar una fila de «En qué se va» o de «Ingresos» abre su detalle: total del mes, nº de apuntes y días, media,
+el mayor, comparación con el mes anterior, «Dónde» (agrupado por la nota) y «Día a día». Tocar un apunte lo edita.
