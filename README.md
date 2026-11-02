@@ -49,3 +49,14 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
   lee, dice qué trae y sustituye lo del móvil (con «Deshacer»). Sin GitHub, Apuntar avisa de guardar copia con 10
   movimientos sin ninguna copia o si la última tiene más de un mes.
 - El repositorio de GitHub ya no viene escrito: cada persona pone el suyo (`usuario/caja-datos`).
+
+## Recurrentes, compartir con una IA y diseños (v1.9)
+
+- La pestaña **Habituales** se llama **Recurrentes** (ingresos fijos y suscripciones). Los datos no cambian.
+- **Ajustes → Compartir con mi IA:** copia un texto con las instrucciones y todo lo que hay en Caja (patrimonio y cuentas,
+  recurrentes, categorías, resumen de cada mes, historial de saldos y cada movimiento con su nota) para pegarlo en
+  cualquier IA. Función `promptIA` de `core.js`. Nunca lleva la llave de GitHub.
+- **Ajustes → Diseño:** Clásico (por omisión) y cinco de cristal (Cristal celeste, Hielo y menta, Noche de cristal, Aurora
+  suave y Aurora naranja). Cada diseño es un bloque `html[data-skin=…]` de variables más una capa común de cristal; se guarda
+  solo en el móvil (`localStorage` `caja-skin`) y la letra del diseño se pide a Google Fonts solo al elegirlo.
+- El aviso de instalar distingue iPhone/iPad (Compartir), Android (menú) y ordenador (sin aviso).

@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.7.1';
+  var VERSION = '1.9.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -451,6 +451,95 @@
     return !a && b ? 1 : a && !b ? -1 : 0;
   }
 
+  /* ---------- Prompt para la IA (v1.8) ----------
+     Un texto con TODO lo que hay en Caja (cuentas, patrimonio, recurrentes, categorías, resumen mensual y cada
+     movimiento) para pegarlo en el chat de cualquier IA. Nunca lleva la llave de GitHub ni nada de la conexión. */
+  function eurTxt(c) {
+    var neg = c < 0, v = Math.abs(Math.round(c)), e = Math.floor(v / 100), d = v % 100;
+    var s = String(e).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + pad2(d);
+    return (neg ? '-' : '') + s + ' €';
+  }
+  var MESES_TXT = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function mesTxt(ym) { return MESES_TXT[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4); }
+  function promptIA(state, nowIso) {
+    var hoy = (nowIso || today()).slice(0, 10), cm = catMap(state), jids = juegoIds(state), cuentas = state.cuentas || [];
+    var movs = allMovs(state).slice().sort(byFechaCreado), pat = patrimonio(state), L = [];
+    function nCat(id) { return cm[id] ? cm[id].n : id; }
+    function nCuenta(ref) {
+      if (!ref) return '';
+      var p = pk(ref), c = findC(state, p.id);
+      return c ? c.nombre + (esInv(c) ? (p.part === 'inv' ? ' (invertido)' : ' (efectivo)') : '') : p.id;
+    }
+    L.push('Eres mi asistente financiero personal. Abajo tienes TODOS los datos de mi app de gastos «Caja» (versión ' + VERSION + '), a fecha de ' + hoy + '.');
+    L.push('Usa solo estos datos. Si algo no está o no cuadra, dímelo en vez de inventarlo. No eres un asesor financiero con licencia: da datos y análisis, no órdenes de comprar o vender.');
+    L.push('Primero responde con: (1) un resumen de mi situación en 5 líneas, (2) las 3 cosas más llamativas que ves y (3) una pregunta sobre qué quiero saber. Después, ayúdame con lo que te pida.');
+    L.push('', '## Cómo leer los datos');
+    L.push('- Todo está en euros. «Gasto» e «Ingreso» son lo que sale y entra de mi dinero. «Traspaso» es dinero que se mueve entre mis propias cuentas: NO es gasto ni ingreso.');
+    L.push('- Si hay categorías de juego, se cuentan en neto (lo sacado menos lo metido) y no inflan gastos ni ingresos.');
+    L.push('- «Invertido» del mes es lo que pasé de mi dinero disponible a cuentas de inversión (menos lo que saqué).');
+    L.push('- Las filas marcadas [auto] las ha apuntado una herramienta automática, no yo a mano.');
+
+    L.push('', '## Patrimonio hoy');
+    L.push('Total ' + eurTxt(pat.total) + ' · disponible ' + eurTxt(pat.liquidez) + ' · invertido ' + eurTxt(pat.invertido) +
+      (pat.total > 0 ? ' (' + Math.round(pat.invertido / pat.total * 100) + ' % invertido)' : ''));
+    pat.cuentas.forEach(function (x) {
+      var c = x.c, t = esInv(c) ? 'inversión' : c.metalico ? 'efectivo (billetes)' : 'dinero disponible';
+      L.push('- ' + c.nombre + ' [' + t + (c.principal ? ', cuenta del día a día' : '') + ']: total ' + eurTxt(x.v) +
+        (esInv(c) ? ' (efectivo ' + eurTxt(x.ef) + ', invertido ' + eurTxt(x.inv) + ')' : ''));
+    });
+
+    var subs = state.subs || [];
+    L.push('', '## Recurrentes (se apuntan solos)');
+    if (!subs.length) L.push('Ninguno.');
+    subs.forEach(function (s) {
+      var tipo = s.tipo === 'ingreso' ? 'ingreso' : s.trabajo ? 'suscripción de trabajo' : 'suscripción';
+      L.push('- ' + s.nombre + ' [' + tipo + ']: ' + eurTxt(s.importe) + ' cada ' + (s.cada === 'año' ? 'año' : 'mes') + ', día ' + s.dia +
+        (s.cada === 'año' && s.mes ? ' de ' + MESES_TXT[s.mes - 1] : '') + (s.desde ? ', desde ' + s.desde : '') + (s.hasta ? ', de baja el ' + s.hasta : ''));
+    });
+
+    var cats = catsOf(state);
+    L.push('', '## Categorías');
+    L.push('Gastos: ' + (cats.gasto.map(function (c) { return fullName(c) + (c.juego ? ' (juego)' : ''); }).join(', ') || '—'));
+    L.push('Ingresos: ' + (cats.ingreso.map(function (c) { return fullName(c) + (c.juego ? ' (juego)' : ''); }).join(', ') || '—'));
+
+    var porMes = {}, meses = [];
+    movs.forEach(function (m) { var k = monthKey(m.fecha); if (!porMes[k]) { porMes[k] = []; meses.push(k); } porMes[k].push(m); });
+    L.push('', '## Resumen por mes (calculado por la app)');
+    if (!meses.length) L.push('Aún no hay movimientos.');
+    meses.forEach(function (k) {
+      var list = porMes[k], r = resumenMes(list, jids, cuentas), by = {}, ord = [];
+      list.forEach(function (m) {
+        if (m.tipo !== 'gasto' || jids.indexOf(m.cat) >= 0) return;
+        if (by[m.cat] == null) { by[m.cat] = 0; ord.push(m.cat); }
+        by[m.cat] += m.importe;
+      });
+      ord.sort(function (a, b) { return by[b] - by[a]; });
+      var l = '- ' + mesTxt(k) + ': gastado ' + eurTxt(r.gasto) + ', ingresado ' + eurTxt(r.ingreso) + ', invertido ' + eurTxt(r.inversion);
+      if (r.juego.n) l += ', juego neto ' + eurTxt(r.juego.neto) + ' (metido ' + eurTxt(r.juego.metido) + ', sacado ' + eurTxt(r.juego.sacado) + ')';
+      L.push(l);
+      if (ord.length) L.push('  Gasto por categoría: ' + ord.map(function (c) { return nCat(c) + ' ' + eurTxt(by[c]); }).join(' · '));
+    });
+
+    var sal = (state.saldos || []).slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
+    if (sal.length) {
+      L.push('', '## Saldos reales que he puesto yo (la foto de cada cuenta ese día)');
+      sal.forEach(function (s) {
+        var c = findC(state, s.cuenta);
+        var inv = c && esInv(c);
+        L.push('- ' + s.fecha + ' · ' + (c ? c.nombre : s.cuenta) + ': ' + (inv ? 'invertido ' + eurTxt(s.saldo || 0) + ', efectivo ' + eurTxt(s.efectivo || 0) : eurTxt(s.saldo || 0)));
+      });
+    }
+
+    L.push('', '## Todos los movimientos (' + movs.length + '), de más antiguo a más reciente');
+    L.push('fecha | tipo | categoría | importe | nota | cuenta');
+    movs.forEach(function (m) {
+      var cuenta = m.tipo === 'traspaso' ? nCuenta(m.origen) + ' → ' + nCuenta(m.cuenta) : nCuenta(m.cuenta);
+      L.push([m.fecha, m.tipo, m.tipo === 'traspaso' ? '' : nCat(m.cat), eurTxt(m.importe), (m.nota || '').replace(/\s+/g, ' ') + (m.auto ? ' [auto]' : '') + (m.sub ? ' [recurrente]' : ''), cuenta].join(' | '));
+    });
+    L.push('', '## Fin de los datos. Empieza por el resumen que te he pedido arriba.');
+    return L.join('\n');
+  }
+
   return {
     VERSION: VERSION, DEF_CATS: DEF_CATS, catsAll: catsAll, catsOf: catsOf, catMap: catMap, MAX_CATS: MAX_CATS,
     copyCats: copyCats, catSlug: catSlug, catSave: catSave, catDelete: catDelete, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
@@ -461,6 +550,6 @@
     movsMes: movsMes, totales: totales, resumenMes: resumenMes, ingresosMes: ingresosMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
     after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,
-    snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo
+    snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo, promptIA: promptIA, eurTxt: eurTxt
   };
 });

@@ -370,4 +370,22 @@ t('grupos de ingresos (v1.6): nombre completo y suma por sitio', () => {
   assert.ok(!C.ingresosMes(L.concat([{ tipo: 'gasto', cat: 'juego-a', importe: 5000 }]), st).some(r => r.key === '__juego'));
 });
 
+t('prompt para la IA (v1.8): lleva todo, con importes en español y sin la llave', () => {
+  const st = {
+    cuentas: [{ id: 'a', nombre: 'Banco', tipo: 'liquidez', principal: true, saldo: 100000, fecha: '2026-10-01', ts: 1 },
+      { id: 'b', nombre: 'Broker', tipo: 'inversion', saldo: 500000, efectivo: 20000, fecha: '2026-10-01', ts: 1 }],
+    saldos: [{ fecha: '2026-10-01', ts: 1, cuenta: 'a', saldo: 100000 }],
+    subs: [{ id: 's1', nombre: 'Netflix', importe: 1299, cada: 'mes', dia: 5, desde: '2026-10-01' }],
+    movs: [{ id: '1', fecha: '2026-11-01', tipo: 'gasto', cat: 'comidas', importe: 123456, nota: 'Mercadona', creado: 5e12 },
+      { id: '2', fecha: '2026-11-02', tipo: 'traspaso', cat: 'traspaso', importe: 20000, origen: 'a', cuenta: 'b', nota: 'DCA', creado: 5e12 + 1 }],
+    auto: { movs: [{ id: 'x', fecha: '2026-11-02', tipo: 'gasto', cat: 'comidas', importe: 500, nota: 'Auto', creado: 5e12 + 2 }] }
+  };
+  const p = C.promptIA(st, '2026-11-03');
+  assert.ok(p.includes('1.234,56 €') && p.includes('Mercadona') && p.includes('Netflix') && p.includes('Banco → Broker (efectivo)'));
+  assert.ok(p.includes('Todos los movimientos (3)') && p.includes('[auto]'));
+  assert.ok(p.includes('## Patrimonio hoy') && p.includes('% invertido'));
+  assert.ok(!/token|llave/i.test(p.split('## Cómo leer')[1]));
+  assert.strictEqual(C.eurTxt(-5), '-0,05 €');
+});
+
 console.log(n + ' pruebas OK');

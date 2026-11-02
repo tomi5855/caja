@@ -13,6 +13,20 @@
 <meta name="apple-mobile-web-app-title" content="Caja">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
+<script>
+/* Diseño elegido (v1.9): se aplica antes de pintar, y la letra del diseño se pide a Google Fonts solo si hace falta. */
+(function(){
+  var F={celeste:'Outfit:wght@400;500;600;700&family=Figtree:wght@400;500;600',menta:'Nunito:wght@500;700;800',noche:'Sora:wght@400;500;600;700',aurora:'Plus+Jakarta+Sans:wght@400;500;600;700',naranja:'Plus+Jakarta+Sans:wght@400;500;600;700'};
+  var TC={celeste:'#DCEEFB',menta:'#D8F4F1',noche:'#071A2D',aurora:'#E6EBFF',naranja:'#FFE9DA'};
+  window.cajaSkin=function(k){
+    var h=document.documentElement,m=document.querySelector('meta[name="theme-color"]'),c=document.querySelector('meta[name="color-scheme"]');
+    if(!F[k]){h.removeAttribute('data-skin');if(m)m.setAttribute('content','#F1F8FD');if(c)c.setAttribute('content','light');return}
+    h.setAttribute('data-skin',k);if(m)m.setAttribute('content',TC[k]);if(c)c.setAttribute('content',k==='noche'?'dark':'light');
+    if(!document.getElementById('skin-font-'+k)){var l=document.createElement('link');l.id='skin-font-'+k;l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+F[k]+'&display=swap';document.head.appendChild(l)}
+  };
+  try{var k=localStorage.getItem('caja-skin');if(k)window.cajaSkin(k)}catch(e){}
+})();
+</script>
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +37,7 @@
    El tema oscuro se queda definido por si algún día se quiere volver a seguir al sistema (quitar data-theme). */
 /* Concepto: una pantalla por tarea. Apuntar con el pulgar (importe → categoría y listo; tarjeta por omisión o
    efectivo de un toque), el mes en lo que llevas gastado y en qué (el % invertido, en pequeño: se mira al cerrar
-   el mes), el patrimonio en otro número (qué % está invertido) y los habituales que se apuntan solos.
+   el mes), el patrimonio en otro número (qué % está invertido) y los recurrentes que se apuntan solos.
    El celeste de Tomás es el único acento. */
 :root{
   --bg:#F1F8FD; --surface:#FFFFFF; --surface2:#E3F1FB; --fg:#0B2540; --muted:#4F6781; --line:#C9E0F1;
@@ -335,6 +349,57 @@ svg{display:block}
   .v-entry{gap:6px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- Diseños (v1.9): «Clásico» es el de siempre; los demás son cristal y se eligen en Ajustes → Diseño ----------
+   Un diseño es un bloque de variables (colores, letra, redondez) y una capa común de cristal. Se guarda solo en este móvil. */
+.skins{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.skin-b{border:1px solid var(--line);border-radius:12px;padding:7px 7px 8px;background:var(--bg);display:flex;flex-direction:column;gap:6px;align-items:stretch;font-size:12px;font-weight:600;color:var(--fg);text-align:center;line-height:1.2}
+.skin-b i{display:block;height:34px;border-radius:9px;border:1px solid rgba(0,0,0,.06)}
+.skin-b[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+html[data-skin="celeste"]{--bg:#DCEEFB;--surface:rgba(255,255,255,.86);--surface2:rgba(91,188,242,.16);--fg:#0B2540;--muted:#4F6781;--line:rgba(11,37,64,.14);--hairline:rgba(11,37,64,.08);--card:rgba(255,255,255,.55);--sky:#5BBCF2;--sky-deep:#3BA5E6;--sky-soft:rgba(91,188,242,.22);--sky-ink:#062B47;--accent:#0F78C2;--liq:#0B2540;--hero-mid:rgba(11,37,64,.18);--hero-weak:rgba(255,255,255,.55);--frame:#C9E3F5;--font-display:'Outfit','Arial Narrow',Arial,sans-serif;--font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;--k-edge:rgba(255,255,255,.85);--k-hi:rgba(255,255,255,.9);--k-on:linear-gradient(160deg,#6CC6F6,#3BA5E6);--k-glow:rgba(15,120,194,.45);--k-r:24px;--k-r2:18px;--k-r3:12px;--card-shadow:0 10px 24px -14px rgba(15,120,194,.4);--k-bg:radial-gradient(60% 38% at 8% 0%,rgba(91,188,242,.75),transparent 70%),radial-gradient(55% 32% at 100% 38%,rgba(255,255,255,.9),transparent 70%),radial-gradient(60% 38% at 15% 100%,rgba(142,208,250,.8),transparent 70%),linear-gradient(165deg,#F1F9FF,#CBE8FB 55%,#A9D8F7)}
+html[data-skin="menta"]{--bg:#D8F4F1;--surface:rgba(255,255,255,.86);--surface2:rgba(111,214,200,.24);--fg:#0A3140;--muted:#4D6F7E;--line:rgba(10,49,64,.14);--hairline:rgba(10,49,64,.08);--card:rgba(255,255,255,.58);--sky:#69DCCB;--sky-deep:#3FB8E8;--sky-soft:rgba(111,214,200,.3);--sky-ink:#05303A;--accent:#0E8C93;--liq:#0A3140;--hero-mid:rgba(10,49,64,.18);--hero-weak:rgba(255,255,255,.55);--frame:#C5ECE8;--font-display:'Nunito','Arial Rounded MT Bold',Arial,sans-serif;--font-body:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;--k-edge:rgba(255,255,255,.9);--k-hi:#fff;--k-on:linear-gradient(160deg,#69DCCB,#3FB8E8);--k-glow:rgba(18,168,160,.45);--k-r:32px;--k-r2:24px;--k-r3:16px;--card-shadow:0 12px 26px -16px rgba(18,140,150,.45);--k-bg:radial-gradient(60% 38% at 8% 0%,rgba(111,224,207,.75),transparent 70%),radial-gradient(55% 34% at 100% 42%,rgba(91,188,242,.5),transparent 70%),radial-gradient(60% 38% at 20% 100%,rgba(182,240,230,.85),transparent 70%),linear-gradient(160deg,#EFFFFC,#D2F4F0 45%,#C4E6FB)}
+html[data-skin="noche"]{color-scheme:dark;--bg:#071A2D;--surface:rgba(10,30,54,.9);--surface2:rgba(108,203,255,.14);--fg:#EAF5FF;--muted:#8FB0CC;--line:rgba(255,255,255,.16);--hairline:rgba(255,255,255,.09);--card:rgba(255,255,255,.08);--sky:#6CCBFF;--sky-deep:#3B9BE6;--sky-soft:rgba(108,203,255,.18);--sky-ink:#04223D;--accent:#6CCBFF;--liq:#EAF5FF;--ok:#4FD08A;--warn:#F2B44E;--danger:#FF7A5C;--hero-mid:rgba(255,255,255,.2);--hero-weak:rgba(255,255,255,.3);--toast-bg:#EAF5FF;--toast-fg:#06182A;--toast-act:#0F78C2;--scrim:rgba(0,0,0,.6);--shadow:rgba(0,0,0,.5);--frame:#040E18;--font-display:'Sora','Arial Narrow',Arial,sans-serif;--font-body:'Sora',system-ui,-apple-system,'Segoe UI',sans-serif;--k-edge:rgba(255,255,255,.18);--k-hi:rgba(255,255,255,.2);--k-on:linear-gradient(160deg,#6CCBFF,#3B9BE6);--k-glow:rgba(108,203,255,.5);--k-r:20px;--k-r2:16px;--k-r3:11px;--card-shadow:0 14px 30px -16px rgba(0,0,0,.7);--k-bg:radial-gradient(60% 38% at 6% 0%,rgba(46,143,224,.55),transparent 70%),radial-gradient(55% 32% at 100% 45%,rgba(108,203,255,.3),transparent 70%),radial-gradient(60% 38% at 20% 100%,rgba(74,108,255,.32),transparent 70%),linear-gradient(170deg,#06182A,#0B2540 60%,#0A2F55)}
+html[data-skin="aurora"]{--bg:#E6EBFF;--surface:rgba(255,255,255,.86);--surface2:rgba(126,140,255,.14);--fg:#1B2250;--muted:#5E668F;--line:rgba(27,34,80,.14);--hairline:rgba(27,34,80,.08);--card:rgba(255,255,255,.55);--sky:#78CBF8;--sky-deep:#7E8CFF;--sky-soft:rgba(126,140,255,.2);--sky-ink:#14204D;--accent:#4A5BE0;--liq:#1B2250;--hero-mid:rgba(27,34,80,.18);--hero-weak:rgba(255,255,255,.55);--frame:#D8DFFA;--font-display:'Plus Jakarta Sans','Arial Narrow',Arial,sans-serif;--font-body:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--k-edge:rgba(255,255,255,.9);--k-hi:#fff;--k-on:linear-gradient(160deg,#78CBF8,#9B8BFF);--k-glow:rgba(106,120,255,.45);--k-r:26px;--k-r2:20px;--k-r3:14px;--card-shadow:0 12px 26px -16px rgba(91,107,255,.45);--k-bg:radial-gradient(60% 38% at 8% 0%,rgba(183,166,255,.7),transparent 70%),radial-gradient(55% 34% at 100% 38%,rgba(127,208,255,.7),transparent 70%),radial-gradient(60% 38% at 15% 100%,rgba(255,196,220,.65),transparent 70%),linear-gradient(160deg,#F6F2FF,#E2EBFF 50%,#D7EEFF)}
+html[data-skin="naranja"]{--bg:#FFE9DA;--surface:rgba(255,255,255,.88);--surface2:rgba(255,154,92,.16);--fg:#14304A;--muted:#6A6F86;--line:rgba(20,48,74,.14);--hairline:rgba(20,48,74,.08);--card:rgba(255,255,255,.58);--sky:#78CBF8;--sky-deep:#FF9A5C;--sky-soft:rgba(255,154,92,.2);--sky-ink:#14304A;--accent:#D9601A;--liq:#14304A;--hero-mid:rgba(20,48,74,.18);--hero-weak:rgba(255,255,255,.55);--frame:#FBDCC7;--font-display:'Plus Jakarta Sans','Arial Narrow',Arial,sans-serif;--font-body:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--k-edge:rgba(255,255,255,.9);--k-hi:#fff;--k-on:linear-gradient(160deg,#78CBF8,#FF9A5C);--k-glow:rgba(255,138,70,.45);--k-r:26px;--k-r2:20px;--k-r3:14px;--card-shadow:0 12px 26px -16px rgba(230,110,40,.45);--k-bg:radial-gradient(60% 38% at 8% 0%,rgba(255,176,120,.75),transparent 70%),radial-gradient(55% 34% at 100% 38%,rgba(127,208,255,.7),transparent 70%),radial-gradient(60% 38% at 15% 100%,rgba(255,206,150,.7),transparent 70%),linear-gradient(160deg,#FFF6EE,#FFE9DA 50%,#D9EFFF)}
+
+html[data-skin] .app::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:var(--k-bg)}
+html[data-skin] .views,html[data-skin] .tabs{position:relative;z-index:1}
+html[data-skin] .card,html[data-skin] .lastbar,html[data-skin] .cat,html[data-skin] .note,html[data-skin] .date,html[data-skin] .pay,html[data-skin] .iconbtn,html[data-skin] .pat-empty,html[data-skin] .seg,html[data-skin] .banner,html[data-skin] .editbar,html[data-skin] .hero,html[data-skin] .tabs,html[data-skin] .skin-b{background:var(--card);border:1px solid var(--k-edge);box-shadow:var(--card-shadow),inset 0 1px 0 var(--k-hi);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5)}
+html[data-skin] .card,html[data-skin] .pat-empty,html[data-skin] .hero{border-radius:var(--k-r)}
+html[data-skin] .lastbar,html[data-skin] .cat,html[data-skin] .note,html[data-skin] .date,html[data-skin] .pay,html[data-skin] .seg,html[data-skin] .banner,html[data-skin] .editbar,html[data-skin] .cats-empty{border-radius:var(--k-r2)}
+html[data-skin] .iconbtn{border-radius:var(--k-r3)}
+html[data-skin] .seg button{border-radius:calc(var(--k-r2) - 4px)}
+html[data-skin] .seg button[aria-pressed="true"],html[data-skin] .cat.on,html[data-skin] .cat.hit,html[data-skin] .pay.on{background:var(--k-on);color:var(--sky-ink);border-color:transparent;box-shadow:0 6px 16px -6px var(--k-glow)}
+html[data-skin] .cat .ic,html[data-skin] .catrow .ic,html[data-skin] .mov .ic,html[data-skin] .jrow .ic{border-radius:var(--k-r3)}
+html[data-skin] .cat.on .ic,html[data-skin] .cat.hit .ic{background:rgba(255,255,255,.35)}
+html[data-skin] .hero{background:var(--card);color:var(--fg)}
+html[data-skin] .hero .btn{background:var(--k-on);color:var(--sky-ink)}
+html[data-skin] .tabs{margin:0 10px calc(6px + env(safe-area-inset-bottom,0px));padding:6px 0;border-radius:calc(var(--k-r) + 4px);flex:none}
+html[data-skin] .tab[aria-current="page"] .ti{background:var(--k-on);color:var(--sky-ink)}
+html[data-skin] .tab[aria-current="page"]{color:var(--fg)}
+html[data-skin] .btn{border-radius:var(--k-r2);background:var(--k-on);color:var(--sky-ink)}
+html[data-skin] .btn.ghost,html[data-skin] .btn.danger{background:transparent;color:var(--fg)}
+html[data-skin] .btn.danger{color:var(--danger)}
+html[data-skin] .h2btn,html[data-skin] .tag,html[data-skin] .when,html[data-skin] .auto{border-radius:999px}
+html[data-skin] .sheet{border-radius:var(--k-r) var(--k-r) 0 0;border:1px solid var(--k-edge);border-bottom:0;-webkit-backdrop-filter:blur(24px) saturate(1.5);backdrop-filter:blur(24px) saturate(1.5)}
+html[data-skin] .sheet .iconbtn{background:var(--surface2);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-skin] .field input,html[data-skin] .field select{border-radius:var(--k-r3);background:var(--surface2);border-color:var(--hairline)}
+html[data-skin] .toast{border-radius:var(--k-r2)}
+html[data-skin] .head h1{font-size:28px}
+html[data-skin] .big{font-size:48px;line-height:.95}
+html[data-skin] .amount-num{font-size:clamp(40px,7.5vh,62px)}
+html[data-skin] .g-num{font-size:clamp(34px,10.5vw,46px)}
+html[data-skin] .sec h2{font-size:18px}
+html[data-skin] .sheet h2{font-size:22px}
+html[data-skin] .sheet h3{font-size:17px}
+html[data-skin] .cat .lb{font-size:12px;letter-spacing:0}
+html[data-skin] .cats.c4 .cat .lb{font-size:11px}
+html[data-skin] .key{font-size:26px}
+html[data-skin] .jrow .amt,html[data-skin] .mov .amt,html[data-skin] .catrow .amt,html[data-skin] .row-item .amt{font-size:16px}
+html[data-skin] .legend b{font-size:17px}
+html[data-skin] .g-legend b{font-size:18px}
+html[data-skin] .gear i{border-color:transparent}
+@media (min-width:600px){html[data-skin] body{background:var(--frame)}}
 </style>
 </head>
 <body>
@@ -421,9 +486,9 @@ svg{display:block}
       </div>
     </section>
 
-    <section class="view" id="v-subs" aria-label="Habituales" hidden>
+    <section class="view" id="v-subs" aria-label="Recurrentes" hidden>
       <div class="head">
-        <h1>Habituales</h1>
+        <h1>Recurrentes</h1>
         <div class="nav"><button class="iconbtn" type="button" data-priv aria-pressed="false" aria-label="Ocultar saldos"></button></div>
       </div>
       <div class="hero" id="subs-hero"></div>
@@ -446,7 +511,7 @@ svg{display:block}
     <button class="tab" type="button" data-go="apuntar" aria-current="page"><span class="ti"><span data-ic="plusc"></span></span><span>Apuntar</span></button>
     <button class="tab" type="button" data-go="mes"><span class="ti"><span data-ic="chart"></span></span><span>Mes</span></button>
     <button class="tab" type="button" data-go="patrimonio"><span class="ti"><span data-ic="wallet"></span></span><span>Patrimonio</span></button>
-    <button class="tab" type="button" data-go="subs"><span class="ti"><span data-ic="repeat"></span></span><span>Habituales</span></button>
+    <button class="tab" type="button" data-go="subs"><span class="ti"><span data-ic="repeat"></span></span><span>Recurrentes</span></button>
   </nav>
 </div>
 
@@ -541,6 +606,24 @@ svg{display:block}
       <h2>Ajustes</h2>
       <button type="button" class="iconbtn" data-close aria-label="Cerrar"><span data-ic="x"></span></button>
     </div>
+    <h3>Diseño</h3>
+    <p class="small">Elige cómo se ve Caja. Se guarda solo en este móvil.</p>
+    <div class="skins" id="skins">
+      <button type="button" class="skin-b" data-skin-pick="" aria-pressed="true"><i style="background:linear-gradient(160deg,#F1F8FD,#5BBCF2)"></i>Clásico</button>
+      <button type="button" class="skin-b" data-skin-pick="celeste" aria-pressed="false"><i style="background:linear-gradient(160deg,#F1F9FF,#A9D8F7 60%,#5BBCF2)"></i>Cristal celeste</button>
+      <button type="button" class="skin-b" data-skin-pick="menta" aria-pressed="false"><i style="background:linear-gradient(160deg,#EFFFFC,#9FE6DA 55%,#4DB8F0)"></i>Hielo y menta</button>
+      <button type="button" class="skin-b" data-skin-pick="noche" aria-pressed="false"><i style="background:linear-gradient(160deg,#06182A,#0B2540 55%,#3B9BE6)"></i>Noche de cristal</button>
+      <button type="button" class="skin-b" data-skin-pick="aurora" aria-pressed="false"><i style="background:linear-gradient(160deg,#F6F2FF,#B7A6FF 55%,#7FD0FF)"></i>Aurora suave</button>
+      <button type="button" class="skin-b" data-skin-pick="naranja" aria-pressed="false"><i style="background:linear-gradient(160deg,#FFF6EE,#FFB07A 55%,#78CBF8)"></i>Aurora naranja</button>
+    </div>
+    <hr class="sep">
+    <h3>Compartir con mi IA</h3>
+    <p class="small">Copia un texto con todo lo que hay en Caja (cuentas, patrimonio, recurrentes, cada movimiento y tus notas) para pegarlo en ChatGPT, Claude, Gemini… Lleva las instrucciones para que te haga un resumen. No lleva tu llave de GitHub. Lo que pegues lo ve esa IA.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="ia-copy">Copiar para mi IA</button>
+      <button type="button" class="btn ghost" id="ia-share" hidden>Enviar a…</button>
+    </div>
+    <hr class="sep">
     <h3>Categorías</h3>
     <p class="small">Las de los botones de Apuntar: añade las tuyas, cámbiales el nombre o bórralas.</p>
     <button type="button" class="btn ghost" data-open="cats">Cambiar categorías</button>
@@ -608,7 +691,7 @@ svg{display:block}
     <label class="field" for="ct-nombre">Nombre<input id="ct-nombre" type="text" maxlength="20" placeholder="Ropa"></label>
     <p class="small" id="ct-grupo" hidden></p>
     <div class="field"><span>Icono</span><div class="icons" id="ct-icons" role="group" aria-label="Icono"></div></div>
-    <label class="check" for="ct-juego"><input type="checkbox" id="ct-juego"><span class="sw"></span><span>Es de juego<small>Póker, apuestas…: lo que metes y lo que sacas se compensan y en Mes solo cuenta el resultado. Sale en gastos y en ingresos.</small></span></label>
+    <label class="check" for="ct-juego"><input type="checkbox" id="ct-juego"><span class="sw"></span><span>Es de juego<small>Casino, apuestas, póker…: lo que metes y lo que sacas se compensan y en Mes solo cuenta el resultado. Sale en gastos y en ingresos.</small></span></label>
     <p class="err" id="ct-err" role="alert"></p>
     <div class="actions">
       <button type="button" class="btn danger" id="ct-del" hidden>Borrar</button>
@@ -817,6 +900,11 @@ function renderPago(){
   b.setAttribute('aria-label',lb+'. Toca para cambiar a '+(ef?(ui.tipo==='ingreso'?'banco':'tarjeta'):'efectivo'));
 }
 function dateLabel(f){var d=C.diffDays(today(),f);if(d===0)return 'Hoy';if(d===1)return 'Ayer';var x=C.parse(f);return x.getDate()+' '+MESES_C[x.getMonth()]}
+/* Cómo se instala según el aparato: iPhone/iPad (Safari), Android (Chrome) o nada que decir (ordenador). */
+function instalarPasos(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+  if(ios)return '<b>Compartir</b> → <b>Añadir a pantalla de inicio</b>';
+  if(/Android/.test(ua))return 'menú <b>⋮</b> → <b>Instalar aplicación</b>';
+  return ''}
 function standalone(){return window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)}
 function renderEntryMeta(){
   $('date-label').textContent=dateLabel(ui.fecha);
@@ -832,7 +920,7 @@ function renderEntryMeta(){
     $('last-txt').innerHTML='Último: <b>'+esc(L.nota||nameOf(L))+'</b> · '+M((L.tipo==='ingreso'?'+':'')+eur(L.importe))+' · '+(mins<1?'ahora':'hace '+mins+' min')}
   var b=$('banner');
   if(e){b.hidden=true}
-  else if(!standalone()&&lsGet(HINT_KEY)!=='1'){b.innerHTML='<span>Instálala antes de apuntar: <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</span><button class="btn-sm" type="button" id="banner-ok">Vale</button>';b.hidden=false}
+  else if(!standalone()&&lsGet(HINT_KEY)!=='1'){var how=instalarPasos();if(how){b.innerHTML='<span>Instálala antes de apuntar: '+how+'.</span><button class="btn-sm" type="button" id="banner-ok">Vale</button>';b.hidden=false}else b.hidden=true}
   else if(copiaPendiente()){b.innerHTML='<span>'+(ultimaCopia()?'Hace más de un mes de tu última copia.':'Lo que apuntas solo está en este móvil.')+' Guarda una copia.</span><button class="btn-sm" type="button" id="banner-copia">Guardar</button>';b.hidden=false}
   else if(!token()){b.hidden=true}
   else{var a=aviso();if(a){b.innerHTML='<span>'+esc(a.texto)+'</span><button class="btn-sm" type="button" id="aviso-ok" data-aviso="'+esc(a.id)+'">Vale</button>';b.hidden=false}else b.hidden=true}
@@ -900,7 +988,7 @@ function leg(c,l,v,base){return '<div><span><i class="dot" style="background:'+c
 function dayLabel(f){var d=C.diffDays(today(),f);if(d===0)return 'Hoy';if(d===1)return 'Ayer';var x=C.parse(f);return DIAS[x.getDay()]+' '+x.getDate()}
 function movRow(m){
   var nm=nameOf(m),title=m.nota||nm,sub=[],f=0,mv=m.tipo==='traspaso'||m.tipo==='inversion';
-  if(m.sub)sub.push(m.tipo==='ingreso'?'Ingreso habitual':m.cat==='trabajo'?'Suscripción de trabajo':'Suscripción');
+  if(m.sub)sub.push(m.tipo==='ingreso'?'Ingreso recurrente':m.cat==='trabajo'?'Suscripción de trabajo':'Suscripción');
   else if(C.juegoIds(S).indexOf(m.cat)>=0){if(m.nota&&m.nota!==nm)sub.push(nm);sub.push(m.tipo==='gasto'?'Metido':'Sacado')}
   else if(mv){
     var o=C.pk(origenOf(m)),d=C.pk(m.cuenta);f=flujoOf(m);
@@ -1100,7 +1188,7 @@ function openSub(id,tipo){
   var s=id?findSub(id):null,t=new Date();
   ui.subTipo=s?(s.tipo||'gasto'):(tipo||'gasto');var ing=ui.subTipo==='ingreso';
   ui.subEdit=s?s.id:null;ui.subCada=s?s.cada:'mes';ui.subDelArm=false;
-  $('sf-title').textContent=s?s.nombre:ing?'Nuevo ingreso habitual':'Nueva suscripción';
+  $('sf-title').textContent=s?s.nombre:ing?'Nuevo ingreso recurrente':'Nueva suscripción';
   $('sf-nombre').placeholder=ing?'Nómina':'Spotify';$('sf-importe').placeholder=ing?'1.200,00':'11,99';
   $('sf-dia-lb').textContent=ing?'Día que llega':'Día de cobro';
   $('sf-nombre').value=s?s.nombre:'';
@@ -1389,6 +1477,27 @@ $('bk-apply').addEventListener('click',function(){
   ui.restore=null;recuperarCopia(R);closeSheets();
   toast('Copia recuperada: '+R.movs.length+(R.movs.length===1?' movimiento':' movimientos'),function(){recuperarCopia(antes)});
 });
+
+/* ---------- Diseño (v1.9) ---------- */
+function skinActual(){return document.documentElement.getAttribute('data-skin')||''}
+function renderSkins(){all('[data-skin-pick]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-skin-pick')===skinActual()))})}
+all('[data-skin-pick]').forEach(function(b){b.addEventListener('click',function(){
+  var k=b.getAttribute('data-skin-pick');window.cajaSkin(k);lsSet('caja-skin',k||null);renderSkins();
+})});
+renderSkins();
+
+/* ---------- Compartir con mi IA (v1.8) ---------- */
+function iaTexto(){return C.promptIA(S,today())}
+function copiarTexto(t,ok,ko){
+  function viejo(){try{var ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);var r=document.execCommand('copy');ta.remove();r?ok():ko()}catch(e){ko()}}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,viejo);else viejo();
+}
+$('ia-copy').addEventListener('click',function(){
+  var t=iaTexto(),n=C.allMovs(S).length;
+  copiarTexto(t,function(){toast('Copiado ('+n+(n===1?' movimiento':' movimientos')+'). Pégalo en tu IA.')},function(){toast('No he podido copiar. Prueba con «Enviar a…».')});
+});
+if(navigator.share)$('ia-share').hidden=false;
+$('ia-share').addEventListener('click',function(){navigator.share({title:'Mis datos de Caja',text:iaTexto()}).catch(function(){})});
 
 /* ---------- Aviso con deshacer ---------- */
 var toastT=null,undoFn=null;
