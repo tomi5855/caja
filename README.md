@@ -70,7 +70,7 @@ el mayor, comparación con el mes anterior, «Dónde» (agrupado por la nota) y 
 
 Un Atajo del iPhone (automatización «Transacción» de Cartera) puede dejar cada pago en el repositorio privado como
 `bandeja/<fecha>.json` con `{"importe": "41,20 €", "comercio": "Mercadona", "fecha": "2026-11-02"}` (el importe admite
-texto con coma y símbolo; la fecha es opcional). Al abrirse, Caja trae la bandeja y enseña arriba en Apuntar «N pagos por
+texto con coma y símbolo; la fecha es opcional y, si falta, se toma del nombre del archivo `AAAAMMDD-HHMMSS.json`). Al abrirse, Caja trae la bandeja y enseña arriba en Apuntar «N pagos por
 confirmar»: **Ver** carga importe, comercio y fecha; se elige la categoría (o «Es <categoría>» si ya apuntaste antes ese
 comercio) y queda apuntado. Descartar también vale. El archivo se borra de GitHub 7 segundos después (para poder deshacer).
 Los archivos mal formados se ignoran. Prueba con el GitHub simulado: `tests/mock_server.py` ya acepta PUT y DELETE.
