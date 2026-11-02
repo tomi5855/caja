@@ -432,6 +432,7 @@ html[data-skin] .gear i{border-color:transparent}
         </div>
       </div>
       <div class="banner" id="banner" hidden></div>
+      <div class="banner" id="bandeja" hidden></div>
       <div class="lastbar" id="lastbar" hidden><span id="last-txt"></span><button class="btn-sm danger" type="button" id="last-del">Quitar</button></div>
       <div class="editbar" id="editbar" hidden>
         <span id="edit-txt">Editando</span>
@@ -806,8 +807,8 @@ function hhmm(ts){var d=new Date(ts);return d.getHours()+':'+C.pad2(d.getMinutes
 function whenTxt(ts){var f=C.iso(new Date(ts)),d=C.diffDays(today(),f);return d===0?'hoy a las '+hhmm(ts):d===1?'ayer a las '+hhmm(ts):'el '+shortDate(f)}
 
 /* ---------- Estado (en este móvil) ---------- */
-function blank(){return {v:2,movs:[],cuentas:[],subs:[],saldos:[],sync:{repo:REPO_DEFAULT,sha:{},pend:{},last:null,err:null}}}
-function fix(o){o.auto=o.auto||null;o.movs=o.movs||[];o.cuentas=o.cuentas||[];o.subs=o.subs||[];o.saldos=o.saldos||[];o.sync=o.sync||{};o.sync.repo=o.sync.repo||REPO_DEFAULT;o.sync.sha=o.sync.sha||{};o.sync.pend=o.sync.pend||{};return o}
+function blank(){return {v:2,movs:[],cuentas:[],subs:[],saldos:[],bandeja:[],sync:{bdel:{},repo:REPO_DEFAULT,sha:{},pend:{},last:null,err:null}}}
+function fix(o){o.auto=o.auto||null;o.movs=o.movs||[];o.cuentas=o.cuentas||[];o.subs=o.subs||[];o.saldos=o.saldos||[];o.sync=o.sync||{};o.sync.repo=o.sync.repo||REPO_DEFAULT;o.sync.sha=o.sync.sha||{};o.sync.pend=o.sync.pend||{};o.sync.bdel=o.sync.bdel||{};o.bandeja=o.bandeja||[];return o}
 function load(){var r=lsGet(KEY);if(r){try{var o=JSON.parse(r);if(o&&o.v===2)return fix(o)}catch(e){}}return blank()}
 var S=load();
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('No se ha podido guardar en el móvil. Libera espacio y vuelve a intentarlo.')}}
@@ -940,6 +941,7 @@ function renderEntryMeta(){
   var L=lastMov();$('lastbar').hidden=!!e||!L;
   if(L&&!e){var mins=Math.floor((Date.now()-L.creado)/60000);
     $('last-txt').innerHTML='Último: <b>'+esc(L.nota||nameOf(L))+'</b> · '+M((L.tipo==='ingreso'?'+':'')+eur(L.importe))+' · '+(mins<1?'ahora':'hace '+mins+' min')}
+  renderBandeja();
   var b=$('banner');
   if(e){b.hidden=true}
   else if(!standalone()&&lsGet(HINT_KEY)!=='1'){var how=instalarPasos();if(how){b.innerHTML='<span>Instálala antes de apuntar: '+how+'.</span><button class="btn-sm" type="button" id="banner-ok">Vale</button>';b.hidden=false}else b.hidden=true}
@@ -958,7 +960,7 @@ function removeMov(m,msg){
   toast(msg,function(){S.movs.push(m);markMonth(m.fecha);changed()});
 }
 function nudge(){var a=$('amount');a.classList.remove('nudge');void a.offsetWidth;a.classList.add('nudge')}
-function resetEntry(){ui.buf='';ui.tipo='gasto';ui.fecha=today();ui.editing=null;ui.delArm=false;ui.trOrig=null;ui.trTodo=false;ui.pago='tarjeta';$('nota').value=''}
+function resetEntry(){ui.fromBand=null;ui.buf='';ui.tipo='gasto';ui.fecha=today();ui.editing=null;ui.delArm=false;ui.trOrig=null;ui.trTodo=false;ui.pago='tarjeta';$('nota').value=''}
 function pickPocket(ref,btn){
   if(!ui.trOrig){ui.trOrig=ref;ui.trTodo=false;renderCats();renderAmount();return}
   var c=cents(ui.buf);
@@ -988,18 +990,88 @@ function pick(key,btn){
       if(m){var d=C.parse(m.fecha);ui.mesY=d.getFullYear();ui.mesM=d.getMonth()}
       persist();go('mes');scheduleSync();toast('Cambios guardados');return;
     }
-    var mov={id:uid(),fecha:ui.fecha,tipo:ui.tipo,cat:cat,importe:c,nota:nota,creado:Date.now()};
+    var mov={id:uid(),fecha:ui.fecha,tipo:ui.tipo,cat:cat,importe:c,nota:nota,creado:Date.now()},bi=ui.fromBand;
     if(cuenta)mov.cuenta=cuenta;
-    S.movs.push(mov);markMonth(mov.fecha);resetEntry();changed();
+    S.movs.push(mov);markMonth(mov.fecha);resetEntry();
+    if(bi)bandejaHecha(bi);
+    changed();
     var n=nameOf(mov);
     var msg=(mov.tipo==='ingreso'?'+'+eur(c)+' de '+n:eur(c)+' en '+n)+(cuenta?' · efectivo':'');
-    toast('Guardado · '+msg,function(){S.movs=S.movs.filter(function(x){return x.id!==mov.id});markMonth(mov.fecha);changed()});
+    toast('Guardado · '+msg,function(){S.movs=S.movs.filter(function(x){return x.id!==mov.id});markMonth(mov.fecha);if(bi)bandejaVuelve(bi);changed()});
   },140);
 }
+/* ---------- Bandeja (v1.11): pagos que deja un Atajo del iPhone, por confirmar ----------
+   El Atajo (automatización «Transacción» de Cartera) crea un archivo bandeja/<fecha>.json en el repositorio privado con
+   {importe, comercio, fecha}. Caja los trae al abrirse y los enseña arriba en Apuntar: se elige la categoría y queda
+   apuntado; el archivo se borra de GitHub unos segundos después (para poder deshacer). */
+function bandejaPend(){var d=S.sync.bdel||{};return (S.bandeja||[]).filter(function(x){return !(x.path in d)})}
+function sugCat(com){
+  var k=String(com||'').trim().toLowerCase();if(!k)return null;
+  var ok={};C.catsOf(S).gasto.forEach(function(c){ok[c.id]=1});
+  var best=null;S.movs.forEach(function(m){if(m.tipo==='gasto'&&ok[m.cat]&&String(m.nota||'').trim().toLowerCase()===k&&(!best||(m.creado||0)>(best.creado||0)))best=m});
+  return best?best.cat:null;
+}
+function renderBandeja(){
+  var bd=$('bandeja'),bp=bandejaPend(),f=ui.fromBand;
+  if(ui.editing||(!f&&!bp.length)){bd.hidden=true;bd.innerHTML='';return}
+  if(f){
+    var sg=sugCat(f.comercio),sn=sg&&cmap()[sg]?cmap()[sg].n:'';
+    bd.innerHTML='<span>Confirmando <b>'+esc(f.comercio||'un pago')+'</b> · '+M(eur(f.importe))+'. Elige la categoría.</span>'
+      +(sn?'<button class="btn-sm" type="button" id="bd-sug" data-sug="'+esc(sg)+'">Es '+esc(sn)+'</button>':'')
+      +'<button class="btn-sm danger" type="button" id="bd-del">Descartar</button><button class="btn-sm" type="button" id="bd-cancel">Luego</button>';
+  }else{
+    var x=bp[0];
+    bd.innerHTML='<span><b>'+bp.length+(bp.length===1?' pago por confirmar':' pagos por confirmar')+'</b>: '+esc(x.comercio||'Pago')+' · '+M(eur(x.importe))+(bp.length>1?' y '+(bp.length-1)+' más':'')+'</span><button class="btn-sm" type="button" id="bd-open">Ver</button>';
+  }
+  bd.hidden=false;
+}
+function startBandeja(x){
+  if(!x)return;
+  ui.editing=null;ui.delArm=false;ui.fromBand=x;ui.tipo='gasto';ui.trOrig=null;ui.trTodo=false;ui.pago='tarjeta';
+  ui.buf=bufFrom(x.importe);ui.fecha=x.fecha>today()?today():x.fecha;$('nota').value=x.comercio||'';
+  go('apuntar');
+}
+function bandejaFlushLater(){setTimeout(flushBandeja,7000)}
+function bandejaHecha(x){S.sync.bdel[x.path]=x.sha;persist();bandejaFlushLater()}
+function bandejaVuelve(x){delete S.sync.bdel[x.path];persist()}
+function flushBandeja(){
+  var d=S.sync.bdel||{},ps=Object.keys(d);
+  if(!ps.length||!token()||navigator.onLine===false)return Promise.resolve();
+  var chain=Promise.resolve();
+  ps.forEach(function(p){chain=chain.then(function(){
+    if(!(p in S.sync.bdel))return;
+    return api('DELETE',p,{message:'caja: pago de la bandeja confirmado',sha:d[p]}).then(function(r){
+      if(r.ok||r.status===404){delete S.sync.bdel[p];S.bandeja=(S.bandeja||[]).filter(function(x){return x.path!==p})}
+    }).catch(function(){});
+  })});
+  return chain.then(function(){persist();renderEntryMeta()});
+}
+function pullBandeja(){
+  if(!token()||navigator.onLine===false)return Promise.resolve();
+  return getJson('bandeja').then(function(list){
+    var files=Array.isArray(list)?list.filter(function(f){return f.type==='file'&&/\.json$/.test(f.name)}):[];
+    var has=function(p){return files.some(function(f){return f.path===p})};
+    S.bandeja=(S.bandeja||[]).filter(function(x){return has(x.path)});
+    Object.keys(S.sync.bdel).forEach(function(p){if(!has(p))delete S.sync.bdel[p]});
+    var known={};S.bandeja.forEach(function(x){known[x.path]=1});
+    var chain=Promise.resolve();
+    files.slice(0,40).forEach(function(f){
+      if(known[f.path]||(f.path in S.sync.bdel))return;
+      chain=chain.then(function(){return getJson(f.path).then(function(j){
+        if(!j)return;var o;try{o=JSON.parse(b64dec(j.content))}catch(_){return}
+        var c=Math.abs(C.parseEur(String(o&&o.importe!=null?o.importe:'')));
+        if(!(c>0))return;
+        S.bandeja.push({path:f.path,sha:j.sha,importe:c,comercio:String(o.comercio||'').trim().slice(0,60),fecha:/^\d{4}-\d{2}-\d{2}$/.test(o.fecha||'')?o.fecha:today()});
+      })});
+    });
+    return chain;
+  }).catch(function(){}).then(function(){persist();renderEntryMeta();return flushBandeja()});
+}
+
 function startEdit(id){
   var m=findMov(id);if(!m)return;
   if(m.tipo==='traspaso'||m.tipo==='inversion'){openMover(m.id);return}
-  ui.editing={id:m.id,tipo:m.tipo,key:m.cat,label:m.nota||nameOf(m)};
+  ui.fromBand=null;ui.editing={id:m.id,tipo:m.tipo,key:m.cat,label:m.nota||nameOf(m)};
   ui.delArm=false;ui.tipo=m.tipo;ui.buf=bufFrom(m.importe);ui.fecha=m.fecha;ui.pago=isCash(m.cuenta)?'efectivo':'tarjeta';$('nota').value=m.nota||'';
   go('apuntar');
 }
@@ -1358,7 +1430,7 @@ function pullConfig(force){
     S.sync.sha['config.json']=j.sha;
     if(pending)markConfig();
     runSubs();persist();renderAll();scheduleSync();
-  }).catch(function(){}).then(pullAuto);
+  }).catch(function(){}).then(pullAuto).then(pullBandeja);
 }
 /* auto.json lo escribe Claude (saldos leídos del bróker, movimientos leídos del correo, avisos).
    El móvil solo lo lee: nunca lo sube ni lo pisa. */
@@ -1606,6 +1678,10 @@ document.addEventListener('click',function(e){
   if(t.id==='aviso-ok'){var v=avisosVistos();v.push(t.getAttribute('data-aviso'));lsSet(AVISOS_KEY,JSON.stringify(v.slice(-50)));renderEntryMeta();return}
   if(t.hasAttribute('data-autoinfo')){toast('Lo apuntó Claude'+(t.getAttribute('data-autoinfo')?' ('+t.getAttribute('data-autoinfo')+')':'')+'. Si está mal, díselo.');return}
   if(t.hasAttribute('data-detail')){var dd=t.getAttribute('data-detail'),ix=dd.indexOf(':');openDetalle(dd.slice(0,ix),dd.slice(ix+1).split(','),t.getAttribute('data-dtitle')||'');return}
+  if(t.id==='bd-open'){startBandeja(bandejaPend()[0]);return}
+  if(t.id==='bd-sug'){pick(t.getAttribute('data-sug'),t);return}
+  if(t.id==='bd-cancel'){resetEntry();renderAll();return}
+  if(t.id==='bd-del'){var bx=ui.fromBand;if(!bx)return;resetEntry();bandejaHecha(bx);renderAll();toast('Descartado: '+(bx.comercio||'pago')+' · '+eur(bx.importe),function(){bandejaVuelve(bx);renderAll()});return}
   if(t.hasAttribute('data-id')){closeSheets();startEdit(t.getAttribute('data-id'));return}
   if(t.hasAttribute('data-subedit')){openSub(t.getAttribute('data-subedit'));return}
   if(t.hasAttribute('data-cuenta')){openCuenta(t.getAttribute('data-cuenta'));return}

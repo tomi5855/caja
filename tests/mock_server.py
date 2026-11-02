@@ -114,5 +114,28 @@ class H(http.server.SimpleHTTPRequestHandler):
         dump()
         return self._json(200 if cur else 201, {'content': {'path': p, 'sha': sha}, 'commit': {'message': body.get('message')}})
 
+    def do_DELETE(self):
+        r = self._route()
+        if r is None:
+            return self._json(405, {})
+        if r[0] == 'down':
+            self.close_connection = True
+            return
+        if r[0] == 'auth':
+            return self._json(401, {'message': 'Bad credentials'})
+        if r[0] != 'contents':
+            return self._json(404, {'message': 'Not Found'})
+        p = r[1]
+        body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))) or b'{}')
+        cur = store.get(p)
+        if not cur:
+            return self._json(404, {'message': 'Not Found'})
+        if body.get('sha') != cur['sha']:
+            return self._json(409, {'message': 'sha does not match'})
+        del store[p]
+        log.append({'path': p, 'message': body.get('message'), 'deleted': True})
+        dump()
+        return self._json(200, {'commit': {'message': body.get('message')}})
+
 
 http.server.ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

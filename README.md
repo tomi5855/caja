@@ -65,3 +65,12 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
 
 En **Mes**, tocar una fila de «En qué se va» o de «Ingresos» abre su detalle: total del mes, nº de apuntes y días, media,
 el mayor, comparación con el mes anterior, «Dónde» (agrupado por la nota) y «Día a día». Tocar un apunte lo edita.
+
+## Bandeja de pagos (v1.11)
+
+Un Atajo del iPhone (automatización «Transacción» de Cartera) puede dejar cada pago en el repositorio privado como
+`bandeja/<fecha>.json` con `{"importe": "41,20 €", "comercio": "Mercadona", "fecha": "2026-11-02"}` (el importe admite
+texto con coma y símbolo; la fecha es opcional). Al abrirse, Caja trae la bandeja y enseña arriba en Apuntar «N pagos por
+confirmar»: **Ver** carga importe, comercio y fecha; se elige la categoría (o «Es <categoría>» si ya apuntaste antes ese
+comercio) y queda apuntado. Descartar también vale. El archivo se borra de GitHub 7 segundos después (para poder deshacer).
+Los archivos mal formados se ignoran. Prueba con el GitHub simulado: `tests/mock_server.py` ya acepta PUT y DELETE.
