@@ -73,7 +73,8 @@ el mayor, comparación con el mes anterior, «Dónde» (agrupado por la nota) y 
   apuntar un gasto que cruza el 80 % o el 100 %, el aviso lo dice. Funciones `presupuesto` y `catSave` (`tope`) de `core.js`.
 - **Mes contra el anterior:** bajo la cifra grande, lo gastado el mes anterior (en el mes de hoy, hasta el mismo día) y el
   % de diferencia (`compMes`).
-- **Evolución del patrimonio** (pestaña Patrimonio): curva desde el primer saldo apuntado. No se guarda una foto diaria: se
+- **Evolución del patrimonio** (pestaña Patrimonio): curva en **porcentaje** (sin euros) desde el primer saldo apuntado, con una
+  escala que abarca al menos un 10 % para que lo pequeño se vea pequeño. No se guarda una foto diaria: se
   reconstruye con los saldos puestos a mano, los de `auto.json` y los movimientos de cada día (`serie`, `patrimonioA`).
   Una cuenta nueva se queda en su primer saldo antes de existir, sin saltos. Es una reconstrucción: si se corrige un apunte
   antiguo, la curva cambia.
