@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.11.3';
+  var VERSION = '1.12.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -58,7 +58,7 @@
   function catMap(state) {
     var m = {}, cs = catsAll(state);
     Object.keys(FIXED).forEach(function (k) { m[k] = { n: FIXED[k].n, i: FIXED[k].i, juego: false }; });
-    cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: fullName(c), corto: c.n, grupo: c.grupo || '', i: c.i, juego: !!c.juego }; });
+    cs.gasto.concat(cs.ingreso).forEach(function (c) { m[c.id] = { n: fullName(c), corto: c.n, grupo: c.grupo || '', i: c.i, juego: !!c.juego, tope: c.tope || 0 }; });
     return m;
   }
   function fullName(c) { return c.grupo ? c.n + ' ' + c.grupo : c.n; }
@@ -193,6 +193,10 @@
     if (cur) { cur.n = n; if (c.i) cur.i = c.i; }
     else if (oculta) { cur = oculta; delete cur.oculta; cur.n = n; if (c.i) cur.i = c.i; }
     else { cur = { id: catIdLibre(cats, catSlug(n)), n: n, i: c.i || 'dots' }; L.splice(posNueva(L), 0, cur); }
+    if ('tope' in c) {
+      if (tipo === 'gasto' && !c.juego && c.tope > 0) cur.tope = Math.round(c.tope);
+      else delete cur.tope;
+    }
     if (c.juego) {
       cur.juego = true;
       if (copia) { copia.n = cur.n; copia.i = cur.i; copia.juego = true; delete copia.oculta; if (cur.grupo) copia.grupo = cur.grupo; }
@@ -451,6 +455,68 @@
     return !a && b ? 1 : a && !b ? -1 : 0;
   }
 
+  /* ---------- Mes contra el anterior y presupuestos (v1.12) ----------
+     compMes compara lo gastado en el mes con el mes anterior. Si el mes es el de hoy, el anterior se corta en el mismo
+     día, para no comparar un mes a medias con uno entero. presupuesto da el estado de un gasto frente a su tope:
+     «warn» desde el 80 % y «over» al pasarse. */
+  function gastoDe(state, ym, hastaDia) {
+    var list = allMovs(state).filter(function (m) { return m.fecha.slice(0, 7) === ym && (!hastaDia || +m.fecha.slice(8) <= hastaDia); });
+    return resumenMes(list, juegoIds(state), state.cuentas).gasto;
+  }
+  function compMes(state, ym, hoy) {
+    var y = +ym.slice(0, 4), mo = +ym.slice(5) - 1, py = mo === 0 ? y - 1 : y, pm = mo === 0 ? 11 : mo - 1;
+    var pym = py + '-' + pad2(pm + 1), parcial = hoy.slice(0, 7) === ym, dia = parcial ? +hoy.slice(8) : 0;
+    return { pym: pym, parcial: parcial, cur: gastoDe(state, ym, 0), prev: gastoDe(state, pym, dia ? Math.min(dia, dim(py, pm)) : 0) };
+  }
+  function presupuesto(gasto, tope) {
+    if (!(tope > 0)) return null;
+    var p = gasto / tope;
+    return { pct: p, queda: tope - gasto, estado: p >= 1 ? 'over' : p >= 0.8 ? 'warn' : 'ok' };
+  }
+
+  /* ---------- Evolución del patrimonio (v1.12) ----------
+     No se guarda una foto diaria: se reconstruye con lo que ya hay. Para cada día se coge, de cada cuenta, el último saldo
+     real puesto a mano (o, si es anterior a todos, el primero), los saldos que dejó Claude hasta ese día y los
+     movimientos hasta ese día. Si una cuenta es nueva, antes de su primer saldo se queda en ese saldo (sin saltos). */
+  function estadoA(state, fecha) {
+    var s = {}, k;
+    for (k in state) s[k] = state[k];
+    var hist = state.saldos || [];
+    s.cuentas = (state.cuentas || []).map(function (c) {
+      var h = hist.filter(function (x) { return x && x.cuenta === c.id && x.fecha; });
+      if (!h.length) return c;
+      h.sort(function (a, b) { return later(a, b) ? 1 : later(b, a) ? -1 : 0; });
+      var pick = h[0];
+      h.forEach(function (x) { if (x.fecha <= fecha) pick = x; });
+      var o = {};
+      for (k in c) o[k] = c[k];
+      o.saldo = pick.saldo || 0;
+      if (esInv(c)) o.efectivo = pick.efectivo || 0; else delete o.efectivo;
+      o.fecha = pick.fecha; o.ts = pick.ts || 0;
+      return o;
+    });
+    s.movs = (state.movs || []).filter(function (m) { return m.fecha <= fecha; });
+    if (state.auto) {
+      s.auto = {};
+      for (k in state.auto) s.auto[k] = state.auto[k];
+      s.auto.saldos = (state.auto.saldos || []).filter(function (x) { return x && x.fecha <= fecha; });
+      s.auto.movs = (state.auto.movs || []).filter(function (x) { return x && x.fecha <= fecha; });
+    }
+    return s;
+  }
+  function patrimonioA(state, fecha) { return patrimonio(estadoA(state, fecha)); }
+  /* Puntos {f, t, liq, inv} desde el primer saldo apuntado hasta hoy (como mucho ~120). */
+  function serie(state, hoy) {
+    var desde = null;
+    (state.saldos || []).forEach(function (x) { if (x && x.fecha && (!desde || x.fecha < desde)) desde = x.fecha; });
+    if (!desde || desde >= hoy) return [];
+    var n = diffDays(hoy, desde), paso = Math.max(1, Math.ceil(n / 120)), out = [];
+    function punto(f) { var p = patrimonioA(state, f); out.push({ f: f, t: p.total, liq: p.liquidez, inv: p.invertido }); }
+    for (var d = 0; d < n; d += paso) punto(addDays(desde, d));
+    punto(hoy);
+    return out;
+  }
+
   /* ---------- Prompt para la IA (v1.8) ----------
      Un texto con TODO lo que hay en Caja (cuentas, patrimonio, recurrentes, categorías, resumen mensual y cada
      movimiento) para pegarlo en el chat de cualquier IA. Nunca lleva la llave de GitHub ni nada de la conexión. */
@@ -499,7 +565,7 @@
 
     var cats = catsOf(state);
     L.push('', '## Categorías');
-    L.push('Gastos: ' + (cats.gasto.map(function (c) { return fullName(c) + (c.juego ? ' (juego)' : ''); }).join(', ') || '—'));
+    L.push('Gastos: ' + (cats.gasto.map(function (c) { return fullName(c) + (c.juego ? ' (juego)' : '') + (c.tope ? ' (presupuesto ' + eurTxt(c.tope) + ' al mes)' : ''); }).join(', ') || '—'));
     L.push('Ingresos: ' + (cats.ingreso.map(function (c) { return fullName(c) + (c.juego ? ' (juego)' : ''); }).join(', ') || '—'));
 
     var porMes = {}, meses = [];
@@ -547,6 +613,7 @@
     startOfDay: startOfDay, monthKey: monthKey,
     parseEur: parseEur, fmtCsvEur: fmtCsvEur, parseCsvEur: parseCsvEur,
     movsToCsv: movsToCsv, parseCsv: parseCsv, csvToMovs: csvToMovs, configDoc: configDoc,
+    compMes: compMes, presupuesto: presupuesto, patrimonioA: patrimonioA, serie: serie,
     movsMes: movsMes, totales: totales, resumenMes: resumenMes, ingresosMes: ingresosMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
     after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,

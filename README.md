@@ -66,6 +66,22 @@ Bolsillos: en los movimientos, `cuenta`/`origen` = `id` es el efectivo de la cue
 En **Mes**, tocar una fila de «En qué se va» o de «Ingresos» abre su detalle: total del mes, nº de apuntes y días, media,
 el mayor, comparación con el mes anterior, «Dónde» (agrupado por la nota) y «Día a día». Tocar un apunte lo edita.
 
+## Presupuestos, evolución y editar apuntes (v1.12)
+
+- **Presupuesto por categoría de gasto** (`tope`, en céntimos, dentro de `cats` de `config.json`): se pone en Ajustes → Cambiar
+  categorías → la categoría. En Mes cada fila enseña lo que queda (barra en ámbar desde el 80 % y roja al pasarse) y, al
+  apuntar un gasto que cruza el 80 % o el 100 %, el aviso lo dice. Funciones `presupuesto` y `catSave` (`tope`) de `core.js`.
+- **Mes contra el anterior:** bajo la cifra grande, lo gastado el mes anterior (en el mes de hoy, hasta el mismo día) y el
+  % de diferencia (`compMes`).
+- **Evolución del patrimonio** (pestaña Patrimonio): curva desde el primer saldo apuntado. No se guarda una foto diaria: se
+  reconstruye con los saldos puestos a mano, los de `auto.json` y los movimientos de cada día (`serie`, `patrimonioA`).
+  Una cuenta nueva se queda en su primer saldo antes de existir, sin saltos. Es una reconstrucción: si se corrige un apunte
+  antiguo, la curva cambia.
+- **Tocar un apunte** (en Mes o en el detalle de una categoría) abre una hoja para cambiar importe, fecha, categoría, nota y
+  efectivo, o borrarlo, sin salir de la pantalla, con Deshacer. «Último» en Apuntar tiene «Editar» además de «Quitar».
+  Los traspasos siguen con su hoja.
+- El aviso con Deshacer dura 3,5 s (antes 6) y los botones pequeños miden 44 px.
+
 ## Bandeja de pagos (v1.11)
 
 Un Atajo del iPhone (automatización «Transacción» de Cartera) puede dejar cada pago en el repositorio privado como

@@ -388,4 +388,51 @@ t('prompt para la IA (v1.8): lleva todo, con importes en español y sin la llave
   assert.strictEqual(C.eurTxt(-5), '-0,05 €');
 });
 
+t('presupuesto por categoría (v1.12): se guarda, avisa al 80 % y al pasarse', () => {
+  const cats = C.copyCats({});
+  const r = C.catSave(cats, 'gasto', { n: 'Ocio', i: 'dots', tope: 15000 }, 'ocio', () => true);
+  assert.ok(!r.err);
+  assert.strictEqual(r.cats.gasto.filter(c => c.id === 'ocio')[0].tope, 15000);
+  assert.strictEqual(C.catMap({ cats: r.cats }).ocio.tope, 15000);
+  // sin la clave «tope» no se toca; con tope vacío se quita; en ingresos o juego no se guarda
+  C.catSave(r.cats, 'gasto', { n: 'Ocio', i: 'dots' }, 'ocio', () => true);
+  assert.strictEqual(r.cats.gasto.filter(c => c.id === 'ocio')[0].tope, 15000);
+  C.catSave(r.cats, 'gasto', { n: 'Ocio', i: 'dots', tope: 0 }, 'ocio', () => true);
+  assert.strictEqual(r.cats.gasto.filter(c => c.id === 'ocio')[0].tope, undefined);
+  assert.strictEqual(C.presupuesto(5000, 0), null);
+  assert.strictEqual(C.presupuesto(7900, 10000).estado, 'ok');
+  assert.strictEqual(C.presupuesto(8000, 10000).estado, 'warn');
+  const o = C.presupuesto(12500, 10000);
+  assert.strictEqual(o.estado, 'over'); assert.strictEqual(o.queda, -2500);
+});
+
+t('mes contra el anterior (v1.12): el mes de hoy se corta en el mismo día', () => {
+  const g = (id, fecha, importe) => ({ id, fecha, tipo: 'gasto', cat: 'comidas', importe, creado: 1 });
+  const st = { cuentas: [], movs: [g('a', '2026-10-02', 1000), g('b', '2026-10-20', 9000), g('c', '2026-11-01', 500), g('d', '2026-11-03', 700)] };
+  const k = C.compMes(st, '2026-11', '2026-11-03');
+  assert.deepStrictEqual([k.pym, k.parcial, k.cur, k.prev], ['2026-10', true, 1200, 1000]);
+  const o = C.compMes(st, '2026-10', '2026-11-03');
+  assert.deepStrictEqual([o.pym, o.parcial, o.cur, o.prev], ['2026-09', false, 10000, 0]);
+  assert.strictEqual(C.compMes(st, '2027-01', '2027-01-31').pym, '2026-12');
+});
+
+t('evolución del patrimonio (v1.12): reconstruida con saldos y movimientos, sin saltos', () => {
+  const st = {
+    cuentas: [{ id: 'd', nombre: 'Día', tipo: 'liquidez', principal: true, saldo: 100000, fecha: '2026-10-10', ts: 5 },
+      { id: 'b', nombre: 'Broker', tipo: 'inversion', saldo: 50000, efectivo: 0, fecha: '2026-10-12', ts: 9 }],
+    saldos: [{ cuenta: 'd', fecha: '2026-10-10', ts: 5, saldo: 100000 }, { cuenta: 'b', fecha: '2026-10-12', ts: 9, saldo: 50000, efectivo: 0 }],
+    movs: [{ id: 'g', fecha: '2026-10-11', tipo: 'gasto', cat: 'comidas', importe: 2000, creado: Date.parse('2026-10-11T10:00:00Z') }],
+    auto: { saldos: [{ cuenta: 'b', fecha: '2026-10-14', ts: 20, inv: 53000, fuente: 'IBKR' }] }
+  };
+  // el broker existe desde antes de su primer saldo (sin salto) y el gasto del 11 solo cuenta desde el 11
+  assert.strictEqual(C.patrimonioA(st, '2026-10-10').total, 150000);
+  assert.strictEqual(C.patrimonioA(st, '2026-10-11').total, 148000);
+  assert.strictEqual(C.patrimonioA(st, '2026-10-13').total, 148000);
+  assert.strictEqual(C.patrimonioA(st, '2026-10-14').total, 151000);
+  const s = C.serie(st, '2026-10-14');
+  assert.strictEqual(s.length, 5);
+  assert.deepStrictEqual([s[0].f, s[4].f, s[4].t], ['2026-10-10', '2026-10-14', 151000]);
+  assert.deepStrictEqual(C.serie({ cuentas: [], saldos: [], movs: [] }, '2026-10-14'), []);
+});
+
 console.log(n + ' pruebas OK');
