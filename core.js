@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.12.1';
+  var VERSION = '1.13.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -226,6 +226,7 @@
   function configDoc(state) {
     var d = { v: 2, app: 'caja' };
     if (state.cats) d.cats = state.cats;
+    if (state.reglas && Object.keys(state.reglas).length) d.reglas = state.reglas;
     d.cuentas = state.cuentas; d.subs = state.subs; d.saldos = state.saldos;
     return JSON.stringify(d, null, 2) + '\n';
   }
@@ -606,6 +607,52 @@
     return L.join('\n');
   }
 
+  /* ---------- Por confirmar, buscar y exportar (v1.13) ----------
+     normCom da la clave de un comercio para recordarlo («MERCADONA  Valencia» = «mercadona valencia»).
+     Las reglas viven en config.json como reglas: {clave: idCategoría}; un pago de la bandeja con regla se apunta solo. */
+  function normCom(s) {
+    var t = String(s || '').toLowerCase();
+    if (t.normalize) t = t.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return t.replace(/[^a-z0-9ñ]+/g, ' ').trim().slice(0, 60);
+  }
+  function reglaDe(state, comercio) {
+    var k = normCom(comercio), r = state.reglas || {};
+    if (!k || !r[k]) return null;
+    var ok = catsOf(state).gasto.some(function (c) { return c.id === r[k]; });
+    return ok ? r[k] : null;
+  }
+  /* Filtro de Buscar: f = {q, que, desde, hasta}. que = '' (todo), 'gasto', 'ingreso', 'mov' (entre cuentas e
+     inversión) o 'cat:<id>'. q busca en la nota, el nombre de la categoría y el importe («23,4» encuentra 23,40). */
+  function filtrar(list, f, state) {
+    var cm = catMap(state), q = normCom(f.q || ''), que = f.que || '';
+    var qn = String(f.q || '').replace(/\s/g, '').replace('€', '');
+    return list.filter(function (m) {
+      if (f.desde && m.fecha < f.desde) return false;
+      if (f.hasta && m.fecha > f.hasta) return false;
+      if (que === 'gasto' || que === 'ingreso') { if (m.tipo !== que) return false; }
+      else if (que === 'mov') { if (m.tipo !== 'traspaso' && m.tipo !== 'inversion') return false; }
+      else if (que.indexOf('cat:') === 0) { if (m.cat !== que.slice(4) || (m.tipo !== 'gasto' && m.tipo !== 'ingreso')) return false; }
+      if (!q) return true;
+      var c = cm[m.cat], txt = normCom((m.nota || '') + ' ' + (c ? fullName(c) : ''));
+      if (txt.indexOf(q) >= 0) return true;
+      return /\d/.test(qn) && fmtCsvEur(m.importe).indexOf(qn.replace('.', ',')) === 0;
+    });
+  }
+  /* CSV para abrir en Excel o Numbers: con punto y coma, coma decimal y BOM (para que salgan bien las tildes). */
+  function exportCsv(list, state) {
+    var cm = catMap(state), cs = {};
+    (state.cuentas || []).forEach(function (c) { cs[c.id] = c.nombre; });
+    function cta(ref) { var p = pk(ref); return p.id ? (cs[p.id] || 'Cuenta borrada') + (p.part === 'inv' ? ' (invertido)' : '') : ''; }
+    var TIPO = { gasto: 'Gasto', ingreso: 'Ingreso', traspaso: 'Entre cuentas', inversion: 'Inversión' };
+    var rows = [['Fecha', 'Tipo', 'Categoría', 'Importe', 'Nota', 'Cuenta', 'Origen'].join(';')];
+    list.slice().sort(byFechaCreado).forEach(function (m) {
+      var c = cm[m.cat], sig = m.tipo === 'gasto' ? -m.importe : m.importe;
+      rows.push([m.fecha, TIPO[m.tipo] || m.tipo, m.tipo === 'traspaso' ? '' : (c ? fullName(c) : m.cat), fmtCsvEur(sig),
+        m.nota || '', cta(m.cuenta), m.tipo === 'traspaso' ? cta(m.origen) : ''].map(csvCell).join(';'));
+    });
+    return '﻿' + rows.join('\r\n') + '\r\n';
+  }
+
   return {
     VERSION: VERSION, DEF_CATS: DEF_CATS, catsAll: catsAll, catsOf: catsOf, catMap: catMap, MAX_CATS: MAX_CATS,
     copyCats: copyCats, catSlug: catSlug, catSave: catSave, catDelete: catDelete, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
@@ -617,6 +664,7 @@
     movsMes: movsMes, totales: totales, resumenMes: resumenMes, ingresosMes: ingresosMes,
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
     after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,
-    snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo, promptIA: promptIA, eurTxt: eurTxt
+    snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo, promptIA: promptIA, eurTxt: eurTxt,
+    normCom: normCom, reglaDe: reglaDe, filtrar: filtrar, exportCsv: exportCsv
   };
 });

@@ -91,3 +91,24 @@ texto con coma y símbolo; la fecha es opcional y, si falta, se toma del nombre 
 confirmar»: **Ver** carga importe, comercio y fecha; se elige la categoría (o «Es <categoría>» si ya apuntaste antes ese
 comercio) y queda apuntado. Descartar también vale. El archivo se borra de GitHub 7 segundos después (para poder deshacer).
 Los archivos mal formados se ignoran. Prueba con el GitHub simulado: `tests/mock_server.py` ya acepta PUT y DELETE.
+
+## Por confirmar, buscar y presupuestos en una hoja (v1.13)
+
+- **Mes tiene tres pestañas:** Resumen (lo de siempre), Buscar y Por confirmar (esta solo con GitHub conectado o si hay
+  pagos en la bandeja). La pestaña Mes de abajo lleva un número rojo con los pagos sin confirmar; en Apuntar queda un
+  aviso pequeño con «Ver», que lleva a Por confirmar.
+- **Por confirmar:** una tarjeta por pago, del más antiguo al más nuevo. Se puede cambiar el **importe** (si pagaste por
+  más gente, pones lo tuyo) y la nota. Tocar una categoría **solo la marca**; se apunta al pulsar «Apuntar» (un toque sin
+  querer no apunta nada). La categoría que ya usaste con ese comercio sale marcada como «sugerida». «Confirmar lo
+  sugerido» apunta de golpe los que tienen sugerencia (pide un segundo toque). «Descartar» lo quita, con Deshacer.
+- **Recordar un comercio:** al apuntar, «Recordar» guarda el comercio en `reglas` de `config.json`
+  (`{"mercadona": "comidas"}`, clave de `normCom`). La próxima vez que llegue un pago de ese comercio se apunta solo, con el
+  importe entero, y sale un aviso con Deshacer (lo deshecho vuelve a Por confirmar y no se apunta solo otra vez). Solo en
+  un móvil que ya está conectado y al día (`sync.last`), para no pisar meses en GitHub. La lista de comercios recordados
+  está al final de Por confirmar, con «Olvidar».
+- **Buscar:** texto (busca en la nota y en el nombre de la categoría, sin tildes, y en el importe: «23,4» encuentra 23,40),
+  «Qué» (todo, gastos, ingresos, entre cuentas e inversión, o una categoría, también las borradas) y «Cuándo» (este mes,
+  últimos 3 meses, este año o todo). Tocar un apunte lo edita. **Exportar CSV** saca lo que se ve en un archivo para Excel o
+  Numbers (punto y coma, coma decimal, gastos en negativo). Funciones `filtrar` y `exportCsv` de `core.js`.
+- **Ajustes → Presupuestos:** todas las categorías de gasto en una hoja, con lo gastado este mes, para poner o quitar el
+  presupuesto de cada una de una vez. Es el mismo `tope` de antes (también se puede seguir poniendo desde la categoría).

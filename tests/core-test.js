@@ -435,4 +435,42 @@ t('evolución del patrimonio (v1.12): reconstruida con saldos y movimientos, sin
   assert.deepStrictEqual(C.serie({ cuentas: [], saldos: [], movs: [] }, '2026-10-14'), []);
 });
 
+t('por confirmar (v1.13): comercios recordados y config.json', () => {
+  const st = { cats: C.copyCats({}), reglas: { mercadona: 'comidas', viejo: 'no-existe' }, cuentas: [], subs: [], saldos: [] };
+  assert.strictEqual(C.normCom('  MERCADONA,  València '), 'mercadona valencia');
+  assert.strictEqual(C.reglaDe(st, 'Mercadona'), 'comidas');
+  assert.strictEqual(C.reglaDe(st, 'mercadona!'), 'comidas');
+  assert.strictEqual(C.reglaDe(st, 'Viejo'), null);       // la categoría ya no está: no se apunta solo
+  assert.strictEqual(C.reglaDe(st, ''), null);
+  assert.deepStrictEqual(JSON.parse(C.configDoc(st)).reglas, st.reglas);
+  assert.strictEqual(JSON.parse(C.configDoc({ cuentas: [], subs: [], saldos: [], reglas: {} })).reglas, undefined);
+});
+
+t('buscar y exportar (v1.13)', () => {
+  const st = { cats: C.copyCats({}), cuentas: [{ id: 'd', nombre: 'Día', tipo: 'liquidez' }, { id: 'b', nombre: 'Bróker', tipo: 'inversion' }] };
+  const L = [
+    { id: '1', fecha: '2026-10-02', tipo: 'gasto', cat: 'comidas', importe: 2340, nota: 'Mercadona', creado: 1 },
+    { id: '2', fecha: '2026-11-03', tipo: 'gasto', cat: 'ocio', importe: 1200, nota: 'Cine; "Dune"', creado: 2 },
+    { id: '3', fecha: '2026-11-04', tipo: 'ingreso', cat: 'nomina', importe: 140000, nota: '', creado: 3 },
+    { id: '4', fecha: '2026-11-05', tipo: 'traspaso', cat: 'traspaso', importe: 50000, nota: '', cuenta: 'b:inv', origen: 'd', creado: 4 }
+  ];
+  const ids = f => C.filtrar(L, f, st).map(m => m.id).join('');
+  assert.strictEqual(ids({}), '1234');
+  assert.strictEqual(ids({ q: 'mercadona' }), '1');
+  assert.strictEqual(ids({ q: 'ócio' }), '2');           // busca también por categoría y sin tildes
+  assert.strictEqual(ids({ q: '23,4' }), '1');
+  assert.strictEqual(ids({ q: '23.40' }), '1');
+  assert.strictEqual(ids({ que: 'gasto' }), '12');
+  assert.strictEqual(ids({ que: 'mov' }), '4');
+  assert.strictEqual(ids({ que: 'cat:nomina' }), '3');
+  assert.strictEqual(ids({ desde: '2026-11-01', hasta: '2026-11-04' }), '23');
+  const csv = C.exportCsv(L, st);
+  assert.ok(csv.charCodeAt(0) === 0xfeff);
+  const rows = csv.slice(1).trim().split('\r\n');
+  assert.strictEqual(rows[0], 'Fecha;Tipo;Categoría;Importe;Nota;Cuenta;Origen');
+  assert.strictEqual(rows[1], '2026-10-02;Gasto;Comidas;-23,40;Mercadona;;');
+  assert.strictEqual(rows[2], '2026-11-03;Gasto;Ocio;-12,00;"Cine; ""Dune""";;');
+  assert.strictEqual(rows[4], '2026-11-05;Entre cuentas;;500,00;;Bróker (invertido);Día');
+});
+
 console.log(n + ' pruebas OK');
