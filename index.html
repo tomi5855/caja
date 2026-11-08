@@ -425,6 +425,39 @@ button.catrow:active,button.jrow:active{opacity:.6}
 .rg-row .t b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rg-row .t small{color:var(--muted);font-size:12px}
 
+/* ---------- Tus inversiones (v1.14) ---------- */
+.g-legend>button{background:none;border:0;padding:0;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0;font-size:13px;color:var(--muted);cursor:pointer}
+.g-legend>button:last-child{align-items:flex-end;text-align:right}
+.g-legend>button>span:first-child::after{content:' ›';color:var(--accent);font-weight:600}
+.inv-link{margin-top:14px;align-self:center}
+.sheet.tall{max-height:94%;min-height:70%}
+.ivh{background:linear-gradient(155deg,var(--sky) 0%,var(--sky-deep) 100%);color:var(--sky-ink);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;flex:none}
+.ivh .eb{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.ivh .big{font-family:var(--font-display);font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.ivh .sb{font-size:14px}
+.ivh .bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:10px;background:var(--hero-weak)}
+.ivh .bar i{display:block}
+.ivh .lg{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;margin-top:4px}
+.iv-blk{display:flex;flex-direction:column;gap:6px;margin-top:6px;flex:none}
+.iv-bh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;padding:0 2px;align-items:baseline}
+.iv-bh b{font-family:var(--font-display);font-size:21px;font-weight:600}
+.iv-bh b em{font-family:var(--font-body);font-style:normal;font-size:13px;font-weight:500;color:var(--muted)}
+.iv-bh .pc{font-family:var(--font-display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.iv-bh small{font-size:12px;color:var(--muted)}
+.iv-bh small:last-child{text-align:right;white-space:nowrap}
+.iv-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--hairline);width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;color:var(--fg)}
+.iv-row b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iv-row .pc{font-family:var(--font-display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.iv-row small{font-size:12px;color:var(--muted)}
+.iv-row small:nth-of-type(2){text-align:right;white-space:nowrap}
+.iv-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.iv-fact{background:var(--surface2);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.iv-fact b{font-family:var(--font-display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.iv-fact small{font-size:12px;color:var(--muted);line-height:1.35}
+.iv-fact.warn b{color:var(--warn)}
+.iv-facts>.iv-fact:last-child:nth-child(odd){grid-column:1/-1}
+.iv-sep{border:0;border-top:1px solid var(--hairline);margin:6px 0 0}
+
 /* ---------- Diseños (v1.9): «Clásico» es el de siempre; los demás son cristal y se eligen en Ajustes → Diseño ----------
    Un diseño es un bloque de variables (colores, letra, redondez) y una capa común de cristal. Se guarda solo en este móvil. */
 .skins{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -661,11 +694,42 @@ html[data-skin] .gear i{border-color:transparent}
       <label class="field" for="cf-saldo"><span id="cf-saldo-lb">Saldo real hoy (€)</span><input id="cf-saldo" type="text" inputmode="decimal" placeholder="1.250,00"></label>
       <label class="field" for="cf-efectivo" id="cf-efectivo-wrap" hidden>Efectivo hoy (€)<input id="cf-efectivo" type="text" inputmode="decimal" placeholder="100,00"></label>
     </div>
+    <div class="row">
+      <label class="field" for="cf-etq">Para qué es (opcional)<input id="cf-etq" type="text" maxlength="24" placeholder="indexados, swing…"></label>
+      <label class="field" for="cf-int">Remunerada al (% al año)<input id="cf-int" type="text" inputmode="decimal" placeholder="2,5"></label>
+    </div>
     <p class="small" id="cf-auto" hidden></p>
     <div id="cf-pos" hidden></div>
     <p class="err" id="cf-err" role="alert"></p>
     <div class="actions">
       <button type="button" class="btn danger" id="cf-del" hidden>Borrar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Hoja: tus inversiones (v1.14) -->
+<div class="overlay" id="ov-invs" hidden>
+  <div class="sheet tall" id="invs"></div>
+</div>
+
+<!-- Hoja: una posición puesta a mano (v1.14) -->
+<div class="overlay" id="ov-pos" hidden>
+  <form class="sheet" id="pf" autocomplete="off" novalidate>
+    <div class="sheet-head">
+      <h2 id="pf-title">Nueva posición</h2>
+      <button type="button" class="iconbtn" id="pf-back" aria-label="Volver"><span data-ic="x"></span></button>
+    </div>
+    <label class="field" for="pf-nombre">Qué es<input id="pf-nombre" type="text" maxlength="40" placeholder="Oro, MSCI World, Bitcoin…"></label>
+    <div class="row">
+      <label class="field" for="pf-coste">Lo que pusiste (€)<input id="pf-coste" type="text" inputmode="decimal" placeholder="1.000,00"></label>
+      <label class="field" for="pf-valor">Vale hoy (€)<input id="pf-valor" type="text" inputmode="decimal" placeholder="1.080,00"></label>
+    </div>
+    <label class="field" for="pf-desde">Desde cuándo (opcional)<input id="pf-desde" type="date"></label>
+    <p class="small">Lo invertido de la cuenta pasa a ser la suma de sus posiciones. Cuando cambie el valor, vuelve aquí y ponlo.</p>
+    <p class="err" id="pf-err" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="pf-del" hidden>Borrar</button>
       <button type="submit" class="btn">Guardar</button>
     </div>
   </form>
@@ -1557,7 +1621,8 @@ function openDetalle(kind,ids,title){
 var G_R=96,G_LEN=Math.PI*G_R,G_GAP=19;
 var GAUGE='<div class="gauge" id="gauge"><svg viewBox="0 0 220 124" aria-hidden="true"><path class="g-liq" id="g-liq" d="M14 112A96 96 0 0 1 206 112"/><path class="g-inv" id="g-inv" d="M14 112A96 96 0 0 1 206 112"/></svg>'
   +'<div class="g-center"><div class="g-lb">Patrimonio total</div><div class="g-num" id="g-num"></div><div class="g-pc" id="g-pc"></div></div></div>'
-  +'<div class="g-legend"><div><span><i style="background:var(--sky)"></i>Invertido</span><b id="g-inv-v"></b></div><div><span><i style="background:var(--liq)"></i>Liquidez</span><b id="g-liq-v"></b></div></div>';
+  +'<div class="g-legend"><button type="button" data-open="invs"><span><i style="background:var(--sky)"></i>Invertido</span><b id="g-inv-v"></b></button><button type="button" data-open="invs" data-invs="margen"><span><i style="background:var(--liq)"></i>Liquidez</span><b id="g-liq-v"></b></button></div>'
+  +'<button type="button" class="btn ghost slim inv-link" data-open="invs">Ver tus inversiones</button>';
 function arc(el,from,len){
   if(len<=0){el.style.opacity='0';el.style.strokeDasharray='0 '+(G_LEN*2);el.style.strokeDashoffset=String(-from);return}
   el.style.opacity='1';el.style.strokeDasharray=len.toFixed(2)+' '+(G_LEN*2).toFixed(2);el.style.strokeDashoffset=(-from).toFixed(2);
@@ -1641,12 +1706,119 @@ function openCuenta(id){
   $('cf-metalico').checked=!!(c&&c.metalico);
   var g=c&&gestionada(c.id);$('cf-auto').hidden=!g;
   if(g)$('cf-auto').textContent='La actualiza Claude ('+g+'). Si cambias aquí el saldo, vale lo tuyo hasta la siguiente actualización.';
-  var pos=c&&S.auto&&S.auto.posiciones&&S.auto.posiciones[c.id],el=$('cf-pos');el.hidden=!(pos&&pos.length);
-  if(pos&&pos.length)el.innerHTML='<h3>Posiciones</h3>'+pos.map(function(p){return '<div class="pos"><b>'+esc(p.nombre)+'</b><span>'+eur(p.valor||0)+'</span>'+(p.nota?'<small>'+esc(p.nota)+'</small>':'')+'</div>'}).join('');
+  var pos=c&&S.auto&&S.auto.posiciones&&S.auto.posiciones[c.id],el=$('cf-pos');
+  $('cf-etq').value=c&&c.etiqueta||'';$('cf-int').value=c&&c.interes?String(c.interes).replace('.',','):'';
+  if(pos&&pos.length){el.hidden=false;el.innerHTML='<h3>Posiciones <small>· las pone Claude</small></h3>'+pos.map(function(p){return '<div class="pos"><b>'+esc(p.nombre)+'</b><span>'+eur(p.valor||0)+'</span>'+(p.nota?'<small>'+esc(p.nota)+'</small>':'')+'</div>'}).join('')}
+  else if(c&&c.tipo==='inversion'){var mp=c.posiciones||[];el.hidden=false;
+    el.innerHTML='<h3>Posiciones</h3>'+mp.map(function(p){var g=C.ganancia(p);return '<button type="button" class="iv-row" data-posedit="'+esc(c.id)+'|'+esc(p.id)+'"><b>'+esc(p.nombre)+'</b><span class="pc">'+M(eur0(p.valor))+'</span><small>'+(g?pcTxt(g)+' desde que compraste':'Sin lo que pusiste')+'</small><small>'+(g?M(ganTxt(g)):'')+'</small></button>'}).join('')
+      +'<button type="button" class="addrow" data-posnew="'+esc(c.id)+'"><span class="ic">'+svg('plus')+'</span>Añadir posición</button>'}
+  else{el.hidden=true;el.innerHTML=''}
   $('cf-del').hidden=!c;$('cf-del').textContent='Borrar';
   $('cf-err').textContent='';
   syncCtaTipo();openSheet('ov-cta');
 }
+
+/* ---------- Tus inversiones (v1.14) ----------
+   Patrimonio → «Invertido» o «Ver tus inversiones». Arriba lo invertido y el reparto por cuenta; luego el margen de maniobra
+   (lo que tienes sin invertir y cuánto tarda en estar disponible) y un bloque por cuenta con sus posiciones. La ganancia,
+   en % grande y en euros (o dólares en IBKR) pequeño; colores tranquilos, con flechas. */
+function pcTxt(g){return g?(g.pct>=0?'▲ ':'▼ ')+num(Math.round(Math.abs(g.pct)*1000)/10,1)+' %':'—'}
+function ganTxt(g){if(!g)return '';var v=Math.abs(g.v),sg=g.v>=0?'+':'−';return g.mon==='EUR'?sg+eur0(v):sg+num(Math.round(v/100),0)+' '+(g.mon==='USD'?'$':g.mon)}
+function mesAno(f){var x=C.parse(f);return MESES_C[x.getMonth()]+' '+x.getFullYear()}
+var INV_COLS=['var(--sky-ink)','var(--hero-mid)','var(--hero-weak)','rgba(11,37,64,.15)','rgba(255,255,255,.85)'];
+function renderInvs(){
+  var R=C.inversiones(S,today()),h='<div class="sheet-head"><h2>Tus inversiones</h2><button type="button" class="iconbtn" data-close aria-label="Cerrar">'+svg('x')+'</button></div>';
+  h+='<div class="ivh"><span class="eb">Invertido</span><span class="big">'+M(eur0(R.invertido))+'</span><span class="sb">'+pct(R.total>0?R.invertido/R.total:0)+' de tu patrimonio ('+M(eur0(R.total))+')</span>';
+  if(R.bloques.length>1){
+    h+='<div class="bar" role="img" aria-label="Reparto de lo invertido por cuenta">'+R.bloques.map(function(b,i){return '<i style="flex:'+b.peso.toFixed(4)+' 1 0;background:'+INV_COLS[i%INV_COLS.length]+'"></i>'}).join('')+'</div>';
+    h+='<div class="lg">'+R.bloques.map(function(b){return '<span>'+esc(b.c.nombre)+' '+pct(b.peso)+'</span>'}).join('')+'</div>';
+  }
+  h+='</div>';
+  /* Margen de maniobra */
+  if(R.margen.length){
+    h+='<div class="iv-blk" id="iv-margen"><div class="iv-bh"><b>Margen de maniobra</b><span class="pc">'+M(eur0(R.libre))+'</span><small style="grid-column:1/-1">Listo para invertir · '+pct(R.total>0?R.libre/R.total:0)+' de tu patrimonio</small></div><div class="card">';
+    h+=R.margen.map(function(m){
+      var sub=[m.ya?'Al momento, ya en el bróker':'Hay que transferirlo: 1 día'];
+      if(m.interes)sub.push('remunerado al '+num(m.interes,m.interes%1?1:0)+' %: unos '+eur0(Math.round(m.ef*m.interes/100/12))+' al mes');
+      if(m.ya&&m.mesAport)sub.push('da para '+Math.floor(m.ef/m.mesAport)+' meses de aportaciones ('+eur0(m.mesAport)+' al mes)');
+      else if(m.ya&&m.sinInvertir!=null)sub.push('el '+pct(m.sinInvertir)+' de la cuenta está sin invertir');
+      return '<div class="iv-row"><b>'+esc(m.c.nombre)+'</b><span class="pc">'+M(eur0(m.ef))+'</span><small style="grid-column:1/-1">'+esc(sub.join(' · '))+'</small></div>';
+    }).join('')+'</div>';
+    var F=[];
+    if(R.medio&&R.medio.v>0){var mm=R.libre/R.medio.v;F.push('<div class="iv-fact"><b>'+num(mm>=10?Math.round(mm):Math.round(mm*10)/10,mm>=10?0:1)+' meses</b><small>de tus gastos cubre lo que tienes sin invertir (gastas de media '+M(eur0(R.medio.v))+' al mes'+(R.medio.meses<3?', con '+R.medio.meses+(R.medio.meses===1?' mes':' meses')+' de datos':'')+')</small></div>')}
+    if(R.parado>0){var rem=R.margen.filter(function(m){return m.interes})[0];F.push('<div class="iv-fact"><b>'+M(eur0(R.parado))+'</b><small>parados en los brókers sin rendir'+(rem?', mientras '+esc(rem.c.nombre)+' paga un '+num(rem.interes,rem.interes%1?1:0)+' %':'')+'</small></div>')}
+    if(R.prox){var px=R.prox,dd=C.parse(px.fecha);F.push('<div class="iv-fact'+(px.cubierta?'':' warn')+'"><b>'+M(eur0(px.importe))+' el '+dd.getDate()+' '+MESES_C[dd.getMonth()]+'</b><small>próxima aportación ('+esc(px.fondo)+'): '+(px.cubierta?'cubierta':'faltan '+eur0(px.importe-px.ef)+' en '+esc(px.c.nombre))+'</small></div>')}
+    if(F.length)h+='<div class="iv-facts">'+F.join('')+'</div>';
+  }
+  /* Un bloque por cuenta */
+  R.bloques.forEach(function(b){
+    var usd=b.items.some(function(it){return it.moneda==='USD'});
+    var when=b.valorDe?'valor del '+corto(b.fecha):b.fuente?'actualizado '+shortDate(b.fecha):'a mano, '+corto(b.fecha);
+    h+='<hr class="iv-sep"><div class="iv-blk"><div class="iv-bh"><b>'+esc(b.c.nombre)+(b.c.etiqueta?' <em>· '+esc(b.c.etiqueta)+'</em>':'')+'</b><span class="pc">'+pcTxt(b.g)+'</span><small>'+M(eur0(b.inv))+' · '+pct(b.peso)+' de lo invertido · '+when+(usd?' · % en dólares':'')+'</small><small>'+M(ganTxt(b.g))+'</small></div><div class="card">';
+    if(b.items.length){
+      h+=b.items.map(function(it){
+        var sub=M(eur0(it.valor))+' · '+pct(it.peso)+' de todo';
+        if(it.cantidad!=null&&+it.cantidad%1===0&&+it.cantidad>0)sub+=' · '+it.cantidad+(+it.cantidad===1?' acción':' acciones');
+        if(it.desde)sub+=' · desde '+mesAno(it.desde);
+        var tag=b.manual?'button type="button" data-posedit="'+esc(b.c.id)+'|'+esc(it.id||'')+'"':'div';
+        return '<'+tag+' class="iv-row"><b>'+esc(it.nombre)+'</b><span class="pc">'+pcTxt(it.g)+'</span><small>'+sub+'</small><small>'+M(ganTxt(it.g))+'</small></'+(b.manual?'button':'div')+'>';
+      }).join('');
+      if(b.manual)h+='<button type="button" class="addrow" data-posnew="'+esc(b.c.id)+'"><span class="ic">'+svg('plus')+'</span>Añadir posición</button>';
+    }else{
+      h+='<div class="iv-row"><b>Sin desglose todavía</b><span></span><small style="grid-column:1/-1">Añade qué tienes, cuánto pusiste y cuánto vale hoy'+(token()?', o pásale a Claude una captura':'')+'.</small></div>'
+        +'<button type="button" class="addrow" data-posnew="'+esc(b.c.id)+'"><span class="ic">'+svg('plus')+'</span>Añadir posiciones</button>';
+    }
+    h+='</div></div>';
+  });
+  if(!R.bloques.length)h+='<p class="empty">Aún no tienes nada invertido. Añade tus cuentas de inversión en Patrimonio.</p>';
+  h+='<p class="small" style="margin-top:4px">La ganancia es desde que compraste. En las cuentas en dólares va en dólares, para que no la mueva el cambio.</p>';
+  $('invs').innerHTML=h;
+}
+function openInvs(at){
+  renderInvs();openSheet('ov-invs');$('invs').scrollTop=0;
+  if(at==='margen'){var m=$('iv-margen');if(m)$('invs').scrollTop=m.offsetTop-70}
+}
+/* Posiciones a mano (cuentas que Claude no actualiza, como Trade Republic). Se guardan en la cuenta (config.json) y lo
+   invertido de la cuenta pasa a ser su suma, sin tocar su efectivo. */
+function syncInvPos(c){
+  var L=c.posiciones||[];if(!L.length)return;
+  var x=C.saldos(S,c),sum=L.reduce(function(a,p){return a+(p.valor||0)},0),now=Date.now(),t=today();
+  c.saldo=sum;c.efectivo=x.ef;c.fecha=t;c.ts=now;S.saldos.push({fecha:t,ts:now,cuenta:c.id,saldo:sum,efectivo:x.ef});
+}
+function openPos(ctaId,posId,back){
+  var c=findCuenta(ctaId);if(!c)return;
+  var p=posId?(c.posiciones||[]).filter(function(x){return x.id===posId})[0]:null;
+  ui.posCta=c.id;ui.posEdit=p?p.id:null;ui.posBack=back||(ui.posBack||'cta');
+  $('pf-title').textContent=p?p.nombre:'Nueva posición · '+c.nombre;
+  $('pf-nombre').value=p?p.nombre:'';$('pf-coste').value=p&&p.coste?bufFrom(p.coste).replace(/,(\d)$/,',$10'):'';
+  $('pf-valor').value=p&&p.valor?bufFrom(p.valor).replace(/,(\d)$/,',$10'):'';$('pf-desde').value=p&&p.desde||'';$('pf-desde').max=today();
+  $('pf-del').hidden=!p;$('pf-err').textContent='';openSheet('ov-pos');
+}
+function posVolver(){var c=ui.posCta,b=ui.posBack;ui.posBack=null;if(b==='invs')openInvs();else if(c)openCuenta(c);else closeSheets()}
+$('pf-back').addEventListener('click',posVolver);
+$('pf').addEventListener('submit',function(e){
+  e.preventDefault();
+  var c=findCuenta(ui.posCta);if(!c){closeSheets();return}
+  var n=$('pf-nombre').value.trim(),co=C.parseEur($('pf-coste').value),va=C.parseEur($('pf-valor').value),de=$('pf-desde').value;
+  if(!n){$('pf-err').textContent='Pon qué es, por ejemplo «Oro».';return}
+  if(!(va>0)){$('pf-err').textContent='Pon cuánto vale hoy.';return}
+  if($('pf-coste').value.trim()&&!(co>0)){$('pf-err').textContent='Revisa lo que pusiste.';return}
+  if(de&&de>today())de=today();
+  var antes=JSON.parse(JSON.stringify(c.posiciones||[]));
+  c.posiciones=c.posiciones||[];
+  var p=ui.posEdit?c.posiciones.filter(function(x){return x.id===ui.posEdit})[0]:null;
+  if(!p){p={id:uid()};c.posiciones.push(p)}
+  p.nombre=n.slice(0,40);p.valor=va;if(co>0)p.coste=co;else delete p.coste;if(de)p.desde=de;else delete p.desde;p.fecha=today();
+  syncInvPos(c);markConfig();changed();posVolver();
+  toast((ui.posEdit?'Guardado':'Añadido')+' · '+c.nombre+' invertido: '+eur0(c.saldo),function(){c.posiciones=antes;syncInvPos(c);markConfig();changed();if(!$('ov-invs').hidden)renderInvs()});
+});
+$('pf-del').addEventListener('click',function(){
+  var c=findCuenta(ui.posCta);if(!c)return;
+  var antes=JSON.parse(JSON.stringify(c.posiciones||[])),p=(c.posiciones||[]).filter(function(x){return x.id===ui.posEdit})[0];
+  c.posiciones=(c.posiciones||[]).filter(function(x){return x.id!==ui.posEdit});
+  syncInvPos(c);markConfig();changed();posVolver();
+  toast('Borrada: '+(p?p.nombre:'posición'),function(){c.posiciones=antes;syncInvPos(c);markConfig();changed();if(!$('ov-invs').hidden)renderInvs()});
+});
 
 /* ---------- Mover dinero entre cuentas ----------
    Un traspaso no es gasto ni ingreso: resta en la cuenta de origen y suma en la de destino.
@@ -2035,6 +2207,7 @@ function toast(msg,undo){
 /* ---------- Navegación y hojas ---------- */
 function renderAll(){renderPriv();renderCats();renderAmount();renderEntryMeta();renderMes();renderPat();renderSubs();renderSync();
   /* el detalle de una categoría, si está abierto, se pone al día (por ejemplo al deshacer un borrado) */
+  if(!$('ov-invs').hidden){var ist=$('invs').scrollTop;renderInvs();$('invs').scrollTop=ist}
   if(!$('ov-det').hidden&&ui.detArgs){var st=$('det').scrollTop;openDetalle.apply(null,ui.detArgs);$('det').scrollTop=st}}
 var TABS=['apuntar','mes','patrimonio','subs'];
 function go(tab){
@@ -2067,6 +2240,9 @@ document.addEventListener('click',function(e){
   var t=e.target&&e.target.closest?e.target.closest('button'):null;if(!t)return;
   if(t.hasAttribute('data-go')){var to=t.getAttribute('data-go');if(ui.editing&&to!=='apuntar')resetEntry();closeSheets();go(to);return}
   if(t.getAttribute('data-open')==='topes'){openTopes();return}
+  if(t.getAttribute('data-open')==='invs'){openInvs(t.getAttribute('data-invs'));return}
+  if(t.hasAttribute('data-posnew')){openPos(t.getAttribute('data-posnew'),null,$('ov-invs').hidden?'cta':'invs');return}
+  if(t.hasAttribute('data-posedit')){var pe2=t.getAttribute('data-posedit').split('|');openPos(pe2[0],pe2[1],$('ov-invs').hidden?'cta':'invs');return}
   if(t.hasAttribute('data-open')){var o=t.getAttribute('data-open');if(o==='ajustes')openAjustes();else if(o==='cats')openCats('gasto');else if(o==='cuenta')openCuenta(null);else if(o==='sub')openSub(null,'gasto');else if(o==='ing')openSub(null,'ingreso');else if(o==='mover')openMover(null);return}
   if(t.hasAttribute('data-close')){closeSheets();return}
   if(t.hasAttribute('data-priv')){lsSet(PRIV_KEY,privOn()?null:'1');renderPriv();return}
@@ -2166,6 +2342,9 @@ $('cf').addEventListener('submit',function(e){
     var tipoCambia=c.tipo!==ui.ctaTipo,ini=ui.ctaIni||{ef:0,inv:0};c.nombre=n;c.tipo=ui.ctaTipo;
     if(tipoCambia||(inv?(saldo!==ini.inv||ef!==ini.ef):saldo!==ini.ef))setSaldo();
   }
+  var etq=$('cf-etq').value.trim(),itr=parseFloat(String($('cf-int').value).replace(',','.'));
+  if(etq)c.etiqueta=etq.slice(0,24);else delete c.etiqueta;
+  if(itr>0&&itr<20)c.interes=Math.round(itr*100)/100;else delete c.interes;
   if($('cf-principal').checked){S.cuentas.forEach(function(x){x.principal=false});c.principal=true}
   else c.principal=false;
   /* Solo una cuenta de efectivo, de liquidez y que no sea la del día a día. */

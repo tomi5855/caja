@@ -473,4 +473,40 @@ t('buscar y exportar (v1.13)', () => {
   assert.strictEqual(rows[4], '2026-11-05;Entre cuentas;;500,00;;Bróker (invertido);Día');
 });
 
+t('tus inversiones y margen (v1.14)', () => {
+  const st = {
+    cats: C.copyCats({}),
+    cuentas: [
+      { id: 'tr', nombre: 'TR', tipo: 'inversion', principal: true, saldo: 300000, efectivo: 600000, fecha: '2026-11-01', ts: 1, interes: 2.5,
+        posiciones: [{ id: 'p1', nombre: 'Oro', coste: 200000, valor: 220000, desde: '2026-01-10' }, { id: 'p2', nombre: 'BTC', valor: 80000 }] },
+      { id: 'my', nombre: 'MyI', tipo: 'inversion', saldo: 1000000, efectivo: 100000, fecha: '2026-11-01', ts: 1 },
+      { id: 'ib', nombre: 'IBKR', tipo: 'inversion', saldo: 700000, efectivo: 300000, fecha: '2026-11-01', ts: 1 },
+      { id: 'ef', nombre: 'Billetes', tipo: 'liquidez', metalico: true, saldo: 5000, fecha: '2026-11-01', ts: 1 }
+    ],
+    saldos: [], subs: [],
+    movs: [{ id: 'g', fecha: '2026-10-05', tipo: 'gasto', cat: 'comidas', importe: 100000, creado: 1 }],
+    auto: {
+      posiciones: { my: [{ nombre: 'S&P', isin: 'X1', valor: 1000000 }], ib: [{ nombre: 'CB', cantidad: 7, moneda: 'USD', valorMon: 95000, costeMon: 100000, valor: 700000 }] },
+      fondos: { my: [{ isin: 'X1', coste: 800000, desde: '2024-10-02', vlFecha: '2026-11-04' }] },
+      ordenes: { my: [{ fondo: 'A', importe: 20000, dia: 3 }, { fondo: 'B', importe: 10000, dia: 13 }] }
+    }
+  };
+  const R = C.inversiones(st, '2026-11-08');
+  assert.deepStrictEqual(R.bloques.map(b => b.c.id), ['my', 'ib', 'tr']);
+  const my = R.bloques[0], ib = R.bloques[1], tr = R.bloques[2];
+  assert.strictEqual(Math.round(my.g.pct * 1000), 250);           // coste desde fondos por ISIN
+  assert.strictEqual(my.items[0].desde, '2024-10-02');
+  assert.strictEqual(my.fecha, '2026-11-04'); assert.ok(my.valorDe);
+  assert.deepStrictEqual([ib.g.mon, ib.g.v], ['USD', -5000]);     // en dólares
+  assert.ok(tr.manual); assert.strictEqual(tr.g, null);           // a BTC le falta lo que pusiste: sin % del bloque
+  assert.strictEqual(Math.round(tr.items[0].g.pct * 100), 10);
+  assert.strictEqual(R.libre, 1000000);                           // sin los billetes
+  assert.strictEqual(R.parado, 400000);                           // MyI + IBKR (TR está remunerada)
+  assert.deepStrictEqual(R.margen.map(m => [m.c.id, m.ya]), [['tr', false], ['ib', true], ['my', true]]);
+  assert.strictEqual(R.margen[2].mesAport, 30000);
+  assert.deepStrictEqual([R.prox.fecha, R.prox.fondo, R.prox.cubierta], ['2026-11-13', 'B', true]);
+  assert.deepStrictEqual(C.gastoMedio(st, '2026-11-08'), { v: 100000, meses: 1 });
+  assert.strictEqual(C.inversiones(st, '2026-11-20').prox.fecha, '2026-12-03'); // pasa al mes siguiente
+});
+
 console.log(n + ' pruebas OK');

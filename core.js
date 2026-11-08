@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.13.0';
+  var VERSION = '1.14.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -653,6 +653,79 @@
     return '﻿' + rows.join('\r\n') + '\r\n';
   }
 
+  /* ---------- Tus inversiones y margen de maniobra (v1.14) ----------
+     Posiciones de cada cuenta de inversión: las que deja Claude en auto.json (posiciones[id]) o, si no hay, las que se
+     ponen a mano en la cuenta (cuenta.posiciones). Cada posición: {nombre, valor (céntimos €), coste (céntimos €) o, si
+     cotiza en otra divisa, moneda + valorMon + costeMon (céntimos de esa divisa), cantidad, desde (AAAA-MM-DD)}.
+     La ganancia va en la divisa en la que se compró (IBKR, en dólares): así no la mueve el cambio. */
+  function ganancia(it) {
+    if (it.moneda && it.costeMon > 0 && it.valorMon >= 0) return { pct: it.valorMon / it.costeMon - 1, v: it.valorMon - it.costeMon, mon: it.moneda };
+    if (it.coste > 0 && it.valor >= 0) return { pct: it.valor / it.coste - 1, v: it.valor - it.coste, mon: 'EUR' };
+    return null;
+  }
+  function posicionesDe(state, c) {
+    var A = autoOf(state), auto = A.posiciones && A.posiciones[c.id], fondos = (A.fondos && A.fondos[c.id]) || [];
+    var L = auto && auto.length ? auto : (c.posiciones || []), manual = !(auto && auto.length);
+    return { manual: manual, items: L.map(function (p) {
+      var it = { id: p.id, nombre: p.nombre || '—', valor: Math.round(+p.valor || 0), coste: Math.round(+p.coste || 0), moneda: p.moneda || '',
+        valorMon: Math.round(+p.valorMon || 0), costeMon: Math.round(+p.costeMon || 0), cantidad: p.cantidad, desde: p.desde || '', fecha: p.fecha || '' };
+      if (!it.coste && p.isin) fondos.forEach(function (f) { if (f.isin === p.isin) { it.coste = Math.round(+f.coste || 0); if (!it.desde) it.desde = f.desde || ''; } });
+      return it;
+    }) };
+  }
+  /* Gasto medio de los meses completos anteriores (hasta 3) con algo apuntado. */
+  function gastoMedio(state, hoy) {
+    var y = +hoy.slice(0, 4), m = +hoy.slice(5, 7) - 1, tot = 0, n = 0, jids = juegoIds(state), all = allMovs(state);
+    for (var i = 1; i <= 3; i++) {
+      var d = new Date(y, m - i, 1), ym = iso(d).slice(0, 7);
+      var T = resumenMes(all.filter(function (x) { return x.fecha.slice(0, 7) === ym; }), jids, state.cuentas);
+      if (T.gasto > 0) { tot += T.gasto; n++; }
+    }
+    return n ? { v: Math.round(tot / n), meses: n } : null;
+  }
+  function inversiones(state, hoy) {
+    var P = patrimonio(state), A = autoOf(state), bloques = [], margen = [];
+    P.cuentas.forEach(function (x) {
+      var c = x.c;
+      if (c.tipo === 'inversion' && x.inv > 0) {
+        var pos = posicionesDe(state, c), items = pos.items, mon = null, cs = 0, vs = 0, ok = items.length > 0;
+        items.forEach(function (it) {
+          it.peso = P.invertido > 0 ? it.valor / P.invertido : 0;
+          it.g = ganancia(it);
+          if (!it.g) { ok = false; return; }
+          if (mon === null) mon = it.g.mon; else if (mon !== it.g.mon) ok = false;
+          cs += it.moneda ? it.costeMon : it.coste; vs += it.moneda ? it.valorMon : it.valor;
+        });
+        items.sort(function (a, b) { return b.valor - a.valor; });
+        var vl = (A.fondos && A.fondos[c.id] || []).map(function (f) { return f.vlFecha; }).filter(Boolean).sort()[0];
+        bloques.push({ c: c, inv: x.inv, peso: P.invertido > 0 ? x.inv / P.invertido : 0, items: items, manual: pos.manual,
+          g: ok && cs > 0 ? { pct: vs / cs - 1, v: vs - cs, mon: mon } : null,
+          fecha: vl || x.snap.fecha, valorDe: !!vl, fuente: vl ? '' : (x.snap.fuente || '') });
+      }
+      if (c.metalico || !(x.ef > 0)) return;
+      var ya = c.tipo === 'inversion' && !c.principal, ords = (A.ordenes && A.ordenes[c.id]) || [];
+      var mes = ords.reduce(function (s, o) { return s + (+o.importe || 0); }, 0);
+      margen.push({ c: c, ef: x.ef, ya: ya, sinInvertir: c.tipo === 'inversion' && x.v > 0 ? x.ef / x.v : null,
+        interes: +c.interes > 0 ? +c.interes : 0, mesAport: mes, ordenes: ords });
+    });
+    bloques.sort(function (a, b) { return b.inv - a.inv; });
+    margen.sort(function (a, b) { return b.ef - a.ef; });
+    var libre = margen.reduce(function (s, m) { return s + m.ef; }, 0);
+    var parado = margen.filter(function (m) { return m.ya && !m.interes; }).reduce(function (s, m) { return s + m.ef; }, 0);
+    /* Próxima aportación programada (auto.json → ordenes[idCuenta] = [{fondo, importe, dia}]). */
+    var prox = null, dHoy = +hoy.slice(8, 10);
+    margen.concat(P.cuentas.filter(function (x) { return !margen.some(function (m) { return m.c.id === x.c.id; }); }).map(function (x) { return { c: x.c, ef: x.ef, ordenes: (A.ordenes && A.ordenes[x.c.id]) || [] }; }))
+      .forEach(function (m) {
+        (m.ordenes || []).forEach(function (o) {
+          var d = +o.dia, f = d >= dHoy ? hoy.slice(0, 8) + pad2(d) : iso(new Date(+hoy.slice(0, 4), +hoy.slice(5, 7), d));
+          if (!prox || f < prox.fecha) prox = { fecha: f, fondo: o.fondo, importe: +o.importe || 0, c: m.c, ef: m.ef };
+        });
+      });
+    if (prox) prox.cubierta = prox.ef >= prox.importe;
+    return { total: P.total, invertido: P.invertido, liquidez: P.liquidez, bloques: bloques, margen: margen, libre: libre, parado: parado,
+      medio: gastoMedio(state, hoy), prox: prox };
+  }
+
   return {
     VERSION: VERSION, DEF_CATS: DEF_CATS, catsAll: catsAll, catsOf: catsOf, catMap: catMap, MAX_CATS: MAX_CATS,
     copyCats: copyCats, catSlug: catSlug, catSave: catSave, catDelete: catDelete, fullName: fullName, juegoIds: juegoIds, COLS: COLS,
@@ -665,6 +738,7 @@
     chargeDates: chargeDates, materialize: materialize, nextCharge: nextCharge, monthlyEq: monthlyEq,
     after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,
     snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo, promptIA: promptIA, eurTxt: eurTxt,
-    normCom: normCom, reglaDe: reglaDe, filtrar: filtrar, exportCsv: exportCsv
+    normCom: normCom, reglaDe: reglaDe, filtrar: filtrar, exportCsv: exportCsv,
+    ganancia: ganancia, posicionesDe: posicionesDe, gastoMedio: gastoMedio, inversiones: inversiones
   };
 });

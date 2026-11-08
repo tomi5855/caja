@@ -112,3 +112,20 @@ Los archivos mal formados se ignoran. Prueba con el GitHub simulado: `tests/mock
   Numbers (punto y coma, coma decimal, gastos en negativo). Funciones `filtrar` y `exportCsv` de `core.js`.
 - **Ajustes → Presupuestos:** todas las categorías de gasto en una hoja, con lo gastado este mes, para poner o quitar el
   presupuesto de cada una de una vez. Es el mismo `tope` de antes (también se puede seguir poniendo desde la categoría).
+
+## Tus inversiones y margen de maniobra (v1.14)
+
+- **Patrimonio → «Invertido», «Liquidez» o «Ver tus inversiones»** abre una hoja con: lo invertido y qué parte del patrimonio
+  es, con la barra del reparto por cuenta; el bloque **Margen de maniobra**; y un bloque por cuenta de inversión con su %
+  propio y cada posición (valor, % sobre todo lo invertido, ganancia en % grande y en euros o dólares pequeño, «desde»).
+  Colores tranquilos: flechas ▲▼ sin rojo ni verde. Función `inversiones` de `core.js`.
+- **De dónde salen las posiciones:** `auto.json` → `posiciones[idCuenta]` (las pone un asistente) con
+  `{nombre, valor, coste, desde}` o, en otra divisa, `{nombre, cantidad, moneda, valorMon, costeMon, valor}` (la ganancia va
+  en esa divisa); si a un fondo le falta `coste`, se toma de `fondos[idCuenta]` por ISIN. Si no hay, las que se ponen **a
+  mano** en la cuenta (`cuenta.posiciones` de `config.json`: nombre, lo que pusiste, vale hoy, desde); entonces lo invertido de
+  la cuenta pasa a ser su suma (sin tocar su efectivo).
+- **Margen de maniobra:** el efectivo de cada cuenta (sin la de billetes): «al momento» si ya está en un bróker, «1 día» si
+  está en la del día a día o en otra de liquidez. Cuenta con `interes` (% anual, en la hoja de la cuenta) → lo que rinde al
+  mes. Datos: meses de gasto que cubre (gasto medio de hasta 3 meses completos), dinero parado en brókers sin rendir y la
+  próxima aportación programada (`auto.json` → `ordenes[idCuenta] = [{fondo, importe, dia}]`), cubierta o no.
+- La hoja de la cuenta tiene «Para qué es» (`etiqueta`, sale junto al nombre) y «Remunerada al».
