@@ -129,3 +129,16 @@ Los archivos mal formados se ignoran. Prueba con el GitHub simulado: `tests/mock
   mes. Datos: meses de gasto que cubre (gasto medio de hasta 3 meses completos), dinero parado en brókers sin rendir y la
   próxima aportación programada (`auto.json` → `ordenes[idCuenta] = [{fondo, importe, dia}]`), cubierta o no.
 - La hoja de la cuenta tiene «Para qué es» (`etiqueta`, sale junto al nombre) y «Remunerada al».
+
+## Pagado con, gastos fijos, traspasos de cada mes y apartados (v1.15)
+
+Todo es opcional: no cambia nada hasta que se activa.
+- **«¿Con qué has pagado?»**: con dos cuentas o más marcadas «La uso para pagar» (hoja de la cuenta), en Apuntar sale una fila
+  de cuentas encima del importe. Se queda elegida la última. El gasto o ingreso lleva esa `cuenta` y sale de ella. En Mes,
+  «Por cuenta» dice lo gastado con cada una; al tocar un apunte, «Pagado con» lo cambia.
+- **Recurrentes en apartados**: Ingresos, **Gastos fijos** (`fijo: true` + `cat`: casa, seguros…), Suscripciones y **Traspasos
+  entre tus cuentas** (`tipo: "traspaso"`, `origen`, `cuenta`; `"id:inv"` = a lo invertido). `noApuntar: true` = solo para
+  tenerlo en cuenta (lo trae el extracto). `reparto` = texto que explica un gasto repartido por mes (p. ej. la comunidad).
+- **Apartado en una cuenta** (`cuenta.apartado = {n, v, fecha, sub}`): dinero aparte (p. ej. «Verano y viajes») que no cuenta
+  como listo para invertir; crece con cada traspaso del recurrente `sub`. Sale en Patrimonio y en el Margen de maniobra.
+- **«No contarla como lista para invertir»** (`noMargen`): para las cuentas de gastos.

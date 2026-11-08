@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1.14.0';
+  var VERSION = '1.15.0';
 
   /* Categorías por defecto, genéricas. Las de cada persona viven en config.json de su repositorio privado
      (cats.gasto / cats.ingreso): así nada personal queda en este código, que es público.
@@ -305,6 +305,7 @@
     if (nowTs == null) nowTs = Date.now();
     var created = [];
     state.subs.forEach(function (s) {
+      if (s.noApuntar) return;            /* v1.15: «solo para tenerlo en cuenta» (lo trae el extracto) */
       var from = s.hechoHasta ? addDays(s.hechoHasta, 1) : s.desde;
       var to = nowIso;
       if (s.hasta && s.hasta < to) to = s.hasta;
@@ -312,10 +313,13 @@
       chargeDates(s, from, to).forEach(function (f) {
         var exists = state.movs.some(function (m) { return m.sub === s.id && m.fecha === f; });
         if (!exists) {
-          var ing = s.tipo === 'ingreso';
-          var cat = ing ? (s.cat || (catsOf(state).ingreso[0] || {}).id || 'otros-ingresos') : (s.trabajo ? 'trabajo' : 'suscripciones');
-          var m = { id: uid(), fecha: f, tipo: ing ? 'ingreso' : 'gasto', cat: cat, importe: s.importe,
+          var ing = s.tipo === 'ingreso', tr = s.tipo === 'traspaso';
+          var okG = s.cat && catsOf(state).gasto.some(function (c) { return c.id === s.cat; });
+          var cat = ing ? (s.cat || (catsOf(state).ingreso[0] || {}).id || 'otros-ingresos') : tr ? 'traspaso' : okG ? s.cat : (s.trabajo ? 'trabajo' : 'suscripciones');
+          var m = { id: uid(), fecha: f, tipo: ing ? 'ingreso' : tr ? 'traspaso' : 'gasto', cat: cat, importe: s.importe,
             nota: s.nombre, sub: s.id, creado: f === nowIso ? nowTs : startOfDay(f) };
+          if (tr) { m.origen = s.origen; m.cuenta = s.cuenta; }
+          else if (s.cuenta) m.cuenta = s.cuenta;
           state.movs.push(m); created.push(m);
         }
       });
@@ -653,6 +657,17 @@
     return '﻿' + rows.join('\r\n') + '\r\n';
   }
 
+  /* ---------- Apartado dentro de una cuenta (v1.15) ----------
+     cuenta.apartado = {n, v, fecha, sub}: dinero que se queda aparte (p. ej. «Verano y viajes») y no cuenta como listo
+     para invertir. Vale v en su fecha y crece con cada traspaso del recurrente sub que llegue después. */
+  function apartadoDe(state, c) {
+    var a = c && c.apartado;
+    if (!a || !(a.v >= 0)) return null;
+    var v = a.v;
+    if (a.sub) allMovs(state).forEach(function (m) { if (m.sub === a.sub && m.fecha > (a.fecha || '')) v += m.importe || 0; });
+    return { n: a.n || 'Apartado', v: v };
+  }
+
   /* ---------- Tus inversiones y margen de maniobra (v1.14) ----------
      Posiciones de cada cuenta de inversión: las que deja Claude en auto.json (posiciones[id]) o, si no hay, las que se
      ponen a mano en la cuenta (cuenta.posiciones). Cada posición: {nombre, valor (céntimos €), coste (céntimos €) o, si
@@ -684,7 +699,7 @@
     return n ? { v: Math.round(tot / n), meses: n } : null;
   }
   function inversiones(state, hoy) {
-    var P = patrimonio(state), A = autoOf(state), bloques = [], margen = [];
+    var P = patrimonio(state), A = autoOf(state), bloques = [], margen = [], apartados = [];
     P.cuentas.forEach(function (x) {
       var c = x.c;
       if (c.tipo === 'inversion' && x.inv > 0) {
@@ -705,7 +720,10 @@
       if (c.metalico || !(x.ef > 0)) return;
       var ya = c.tipo === 'inversion' && !c.principal, ords = (A.ordenes && A.ordenes[c.id]) || [];
       var mes = ords.reduce(function (s, o) { return s + (+o.importe || 0); }, 0);
-      margen.push({ c: c, ef: x.ef, ya: ya, sinInvertir: c.tipo === 'inversion' && x.v > 0 ? x.ef / x.v : null,
+      var ap = apartadoDe(state, c), apv = ap ? Math.min(ap.v, x.ef) : 0;
+      if (ap) apartados.push({ c: c, n: ap.n, v: apv });
+      if (c.noMargen || !(x.ef - apv > 0)) return;   /* v1.15: cuenta de gastos, no cuenta como lista para invertir */
+      margen.push({ c: c, ef: x.ef - apv, apartado: ap ? { n: ap.n, v: apv } : null, ya: ya, sinInvertir: c.tipo === 'inversion' && x.v > 0 ? x.ef / x.v : null,
         interes: +c.interes > 0 ? +c.interes : 0, mesAport: mes, ordenes: ords });
     });
     bloques.sort(function (a, b) { return b.inv - a.inv; });
@@ -722,7 +740,7 @@
         });
       });
     if (prox) prox.cubierta = prox.ef >= prox.importe;
-    return { total: P.total, invertido: P.invertido, liquidez: P.liquidez, bloques: bloques, margen: margen, libre: libre, parado: parado,
+    return { total: P.total, invertido: P.invertido, liquidez: P.liquidez, bloques: bloques, margen: margen, libre: libre, parado: parado, apartados: apartados,
       medio: gastoMedio(state, hoy), prox: prox };
   }
 
@@ -739,6 +757,6 @@
     after: after, later: later, pk: pk, pref: pref, vacia: vacia, principalId: principalId, metalicoId: metalicoId, allMovs: allMovs,
     snapOf: snapOf, saldos: saldos, saldoActual: saldoActual, patrimonio: patrimonio, flujo: flujo, promptIA: promptIA, eurTxt: eurTxt,
     normCom: normCom, reglaDe: reglaDe, filtrar: filtrar, exportCsv: exportCsv,
-    ganancia: ganancia, posicionesDe: posicionesDe, gastoMedio: gastoMedio, inversiones: inversiones
+    ganancia: ganancia, posicionesDe: posicionesDe, gastoMedio: gastoMedio, inversiones: inversiones, apartadoDe: apartadoDe
   };
 });

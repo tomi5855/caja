@@ -509,4 +509,32 @@ t('tus inversiones y margen (v1.14)', () => {
   assert.strictEqual(C.inversiones(st, '2026-11-20').prox.fecha, '2026-12-03'); // pasa al mes siguiente
 });
 
+t('recurrentes y apartado (v1.15)', () => {
+  let k2 = 0; const id = () => 'r' + (++k2);
+  const st = {
+    cats: C.copyCats({}),
+    cuentas: [{ id: 'b', nombre: 'BBVA', tipo: 'liquidez', principal: true, saldo: 500000, fecha: '2026-11-01', ts: 1 },
+      { id: 'tr', nombre: 'TR', tipo: 'inversion', saldo: 0, efectivo: 1232047, fecha: '2026-11-01', ts: 1,
+        apartado: { n: 'Verano', v: 232047, fecha: '2026-11-01', sub: 's-ver' } }],
+    saldos: [], movs: [],
+    subs: [
+      { id: 's-hip', nombre: 'Hipoteca', importe: 120471, cada: 'mes', dia: 30, desde: '2026-11-01', fijo: true, cat: 'casa' },
+      { id: 's-luz', nombre: 'Luz', importe: 9000, cada: 'mes', dia: 29, desde: '2026-11-01', fijo: true, cat: 'casa', noApuntar: true },
+      { id: 's-ver', nombre: 'Ahorro verano', tipo: 'traspaso', importe: 20000, cada: 'mes', dia: 5, desde: '2026-11-01', origen: 'b', cuenta: 'tr' },
+      { id: 's-plan', nombre: 'Planes', tipo: 'traspaso', importe: 30000, cada: 'mes', dia: 5, desde: '2026-11-01', origen: 'b', cuenta: 'tr:inv' }
+    ]
+  };
+  const made = C.materialize(st, '2026-11-30', id, 0);
+  assert.deepStrictEqual(made.map(m => [m.nota, m.tipo, m.cat]).sort(),
+    [['Ahorro verano', 'traspaso', 'traspaso'], ['Hipoteca', 'gasto', 'casa'], ['Planes', 'traspaso', 'traspaso']]); // la luz no se apunta
+  const ap = C.apartadoDe(st, st.cuentas[1]);
+  assert.deepStrictEqual(ap, { n: 'Verano', v: 252047 });          // + los 200 € del día 5
+  const x = C.saldos(st, st.cuentas[1]);
+  assert.deepStrictEqual([x.ef, x.inv], [1252047, 30000]);
+  const R = C.inversiones(st, '2026-11-30');
+  const trm = R.margen.filter(m => m.c.id === 'tr')[0];
+  assert.strictEqual(trm.ef, 1000000);                              // 10.000 € listos: el apartado no cuenta
+  assert.strictEqual(R.apartados[0].v, 252047);
+});
+
 console.log(n + ' pruebas OK');
